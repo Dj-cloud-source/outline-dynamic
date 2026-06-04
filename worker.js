@@ -1,26 +1,13 @@
-// 用户密钥通讯录从 Cloudflare 的 Secret 变量 USER_KEYS_JSON 读取。
-// USER_KEYS_JSON 示例：
-// {
-//   "zhangsan": "ss://完整密钥1",
-//   "lisi": "ss://完整密钥2"
-// }
-function getUserKeys(env = {}) {
-  const rawUserKeys = env.USER_KEYS_JSON;
-
-  if (!rawUserKeys) {
-    return {};
+// 用户密钥通讯录从 Cloudflare KV 绑定 OUTLINE_USERS 读取。
+// KV 示例：
+// Key: zhangsan
+// Value: ss://完整密钥
+async function getOutlineKey(env = {}, userId) {
+  if (!userId || !env.OUTLINE_USERS) {
+    return null;
   }
 
-  if (typeof rawUserKeys === "object") {
-    return rawUserKeys;
-  }
-
-  try {
-    const parsedUserKeys = JSON.parse(rawUserKeys);
-    return parsedUserKeys && typeof parsedUserKeys === "object" ? parsedUserKeys : {};
-  } catch (e) {
-    return {};
-  }
+  return await env.OUTLINE_USERS.get(userId);
 }
 
 function htmlResponse(html, init = {}) {
@@ -127,7 +114,6 @@ export default {
   async fetch(request, env, ctx) {
     const requestUrl = new URL(request.url);
     const path = requestUrl.pathname;
-    const userKeys = getUserKeys(env);
 
     // ========================================================
     // 模块 A：如果用户访问的是首页 (根目录 /)，返回交互式网页
@@ -139,8 +125,9 @@ export default {
     // 校验用户名是否存在，存在才给前端返回订阅链接。
     if (path === '/api/link') {
       const userId = requestUrl.searchParams.get('user') || '';
+      const outlineKey = await getOutlineKey(env, userId);
 
-      if (!userId || !userKeys[userId]) {
+      if (!outlineKey) {
         return new Response(JSON.stringify({ message: "用户不存在或输入错误。" }), {
           status: 404,
           headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -161,7 +148,7 @@ export default {
     // 提取用户名 (例如从 /zhangsan 提取出 zhangsan)
     const userId = path.replace('/', '');
 
-    const outlineKey = userKeys[userId];
+    const outlineKey = await getOutlineKey(env, userId);
 
     if (!outlineKey) {
       return new Response("用户不存在或链接错误", { status: 404 });
