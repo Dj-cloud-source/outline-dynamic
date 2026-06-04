@@ -124,7 +124,7 @@ export default {
 
     // 校验用户名是否存在，存在才给前端返回订阅链接。
     if (path === '/api/link') {
-      const userId = requestUrl.searchParams.get('user') || '';
+      const userId = (requestUrl.searchParams.get('user') || '').trim();
       const outlineKey = await getOutlineKey(env, userId);
 
       if (!outlineKey) {
@@ -134,7 +134,9 @@ export default {
         });
       }
 
-      return new Response(JSON.stringify({ link: `ssconf://${requestUrl.host}/${encodeURIComponent(userId)}` }), {
+      const encodedUserId = encodeURIComponent(userId).replace(/%40/g, "@");
+
+      return new Response(JSON.stringify({ link: `ssconf://${requestUrl.host}/${encodedUserId}` }), {
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           "Cache-Control": "no-store",
@@ -146,7 +148,7 @@ export default {
     // 模块 B：处理机器请求，下发真实的 JSON 订阅数据
     // ========================================================
     // 提取用户名 (例如从 /zhangsan 提取出 zhangsan)
-    const userId = path.replace('/', '');
+    const userId = decodeURIComponent(path.slice(1)).trim();
 
     const outlineKey = await getOutlineKey(env, userId);
 
