@@ -1,5 +1,5 @@
 name = "outline-dynamic"
-main = "worker.js"
+main = "src/index.js"
 compatibility_date = "2026-06-03"
 
 [[kv_namespaces]]
