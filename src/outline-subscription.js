@@ -19,6 +19,15 @@ export function buildSubscriptionLink(host, userId) {
   return `ssconf://${host}/${encodedUserId}`;
 }
 
+export function getOutlineConnectionTarget(outlineKey) {
+  const url = new URL(outlineKey);
+
+  return {
+    host: url.hostname,
+    port: parseInt(url.port, 10),
+  };
+}
+
 export function convertOutlineKeyToJson(outlineKey) {
   const url = new URL(outlineKey);
   const base64UserInfo = url.username;

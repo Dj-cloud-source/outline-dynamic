@@ -1,4 +1,5 @@
 import { renderHomePage } from "./home-page.js";
+import { checkCurrentService } from "./service-check.js";
 import {
   buildSubscriptionLink,
   convertOutlineKeyToJson,
@@ -53,6 +54,16 @@ export default {
       return jsonResponse({
         link: buildSubscriptionLink(requestUrl.host, userId),
       });
+    }
+
+    // 检测当前主服务连通性，不暴露真实节点地址。
+    if (path === '/api/check') {
+      const result = await checkCurrentService(env);
+
+      return jsonResponse({
+        status: result.status,
+        message: result.message,
+      }, { status: result.httpStatus });
     }
 
     // ========================================================

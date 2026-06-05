@@ -16,9 +16,14 @@ export function renderHomePage() {
             input:focus { border-color: #007aff; }
             button { width: 100%; padding: 12px; background-color: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background-color 0.2s;}
             button:hover { background-color: #005bb5; }
+            .secondary-btn { margin-top: 10px; background-color: #5856d6; }
+            .secondary-btn:hover { background-color: #3f3db5; }
             #resultBox { margin-top: 25px; display: none; padding-top: 20px; border-top: 1px dashed #eee;}
             .link-text { word-break: break-all; background: #f8f9fa; padding: 10px; border-radius: 6px; font-size: 13px; color: #d63384; margin-bottom: 15px;}
             .error-text { margin-top: 14px; color: #d93025; font-size: 13px; display: none; }
+            .status-text { margin-top: 14px; color: #555; font-size: 13px; display: none; }
+            .status-ok { color: #1f8f4d; }
+            .status-warning, .status-unavailable { color: #d93025; }
             .copy-btn { background-color: #34c759; }
             .copy-btn:hover { background-color: #28a745; }
           </style>
@@ -29,7 +34,9 @@ export function renderHomePage() {
             <p>请输入管理员分配给您的专属用户名</p>
             <input type="text" id="username" placeholder="例如：zhangsan" autocomplete="off">
             <button onclick="generateLink()">生成我的专属链接</button>
+            <button class="secondary-btn" onclick="checkService()">检测当前服务</button>
             <div class="error-text" id="errorText"></div>
+            <div class="status-text" id="serviceStatus"></div>
             
             <div id="resultBox">
               <div class="link-text" id="linkText"></div>
@@ -69,6 +76,29 @@ export function renderHomePage() {
               } catch (err) {
                 errorText.innerText = '生成失败，请稍后重试。';
                 errorText.style.display = 'block';
+              }
+            }
+
+            function showServiceStatus(message, status) {
+              const serviceStatus = document.getElementById('serviceStatus');
+              serviceStatus.className = 'status-text';
+              if (status) {
+                serviceStatus.classList.add('status-' + status);
+              }
+              serviceStatus.innerText = message;
+              serviceStatus.style.display = 'block';
+            }
+
+            async function checkService() {
+              showServiceStatus('当前服务检测中...', 'pending');
+
+              try {
+                const response = await fetch('/api/check');
+                const data = await response.json();
+
+                showServiceStatus(data.message || '检测暂不可用，请稍后重试。', data.status || (response.ok ? 'ok' : 'unavailable'));
+              } catch (err) {
+                showServiceStatus('检测暂不可用，请稍后重试。', 'unavailable');
               }
             }
 
