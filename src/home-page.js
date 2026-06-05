@@ -62,14 +62,15 @@ export function renderHomePage() {
           display: grid;
           place-items: center;
           border-radius: 8px;
-          background:
-            radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.66), transparent 26%),
-            linear-gradient(145deg, #1d8cff 0%, #3355d9 62%, #5b4fd8 100%);
-          color: #ffffff;
-          font-size: 42px;
-          font-weight: 700;
-          line-height: 1;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34), 0 12px 24px rgba(0, 82, 180, 0.18);
+          overflow: hidden;
+          background: #113d2d;
+          box-shadow: 0 12px 24px rgba(17, 61, 45, 0.18);
+        }
+
+        .icon svg {
+          width: 100%;
+          height: 100%;
+          display: block;
         }
 
         .title {
@@ -223,7 +224,8 @@ export function renderHomePage() {
           color: var(--blue-dark);
         }
 
-        .notice,
+        .account-status,
+        .service-status,
         .result {
           display: none;
           border-radius: 8px;
@@ -232,7 +234,7 @@ export function renderHomePage() {
           padding: 16px;
         }
 
-        .notice-title,
+        .status-title,
         .result-title {
           margin: 0;
           color: var(--text);
@@ -241,7 +243,7 @@ export function renderHomePage() {
           line-height: 1.35;
         }
 
-        .notice-detail,
+        .status-detail,
         .result-detail {
           margin: 5px 0 0;
           color: var(--muted);
@@ -249,16 +251,16 @@ export function renderHomePage() {
           line-height: 1.45;
         }
 
-        .notice-ok .notice-title {
+        .status-ok .status-title {
           color: var(--green);
         }
 
-        .notice-warning .notice-title {
+        .status-warning .status-title {
           color: var(--amber);
         }
 
-        .notice-error .notice-title,
-        .notice-unavailable .notice-title {
+        .status-error .status-title,
+        .status-unavailable .status-title {
           color: var(--red);
         }
 
@@ -385,7 +387,13 @@ export function renderHomePage() {
     <body>
       <main class="page" aria-labelledby="pageTitle">
         <header class="product-header">
-          <div class="icon" aria-hidden="true">C</div>
+          <div class="icon" aria-hidden="true">
+            <svg viewBox="0 0 100 100" role="img" aria-label="Client">
+              <rect width="100" height="100" rx="18" fill="#113d2d"></rect>
+              <path d="M45 25a25 25 0 0 0 0 50z" fill="#5fb89b"></path>
+              <path d="M55 25a25 25 0 0 1 0 50V62a12 12 0 0 0 0-24z" fill="#ffffff"></path>
+            </svg>
+          </div>
           <div>
             <h1 class="title" id="pageTitle">Client</h1>
             <p class="subtitle">账户连接</p>
@@ -409,20 +417,9 @@ export function renderHomePage() {
             </div>
           </section>
 
-          <section>
-            <p class="section-label">状态</p>
-            <div class="group service-row">
-              <div>
-                <p class="row-title">当前服务</p>
-                <p class="row-detail" id="serviceSummary">可随时检测当前服务。</p>
-              </div>
-              <button class="text-button" id="checkButton" onclick="checkService()">检测</button>
-            </div>
-          </section>
-
-          <section class="notice" id="noticeBox" role="status" aria-live="polite">
-            <p class="notice-title" id="noticeTitle"></p>
-            <p class="notice-detail" id="noticeDetail"></p>
+          <section class="account-status" id="accountStatusBox" role="status" aria-live="polite">
+            <p class="status-title" id="accountStatusTitle"></p>
+            <p class="status-detail" id="accountStatusDetail"></p>
           </section>
 
           <section class="result" id="resultBox">
@@ -434,6 +431,22 @@ export function renderHomePage() {
               <span class="copy-state" id="copyState"></span>
             </div>
           </section>
+
+          <section>
+            <p class="section-label">状态</p>
+            <div class="group service-row">
+              <div>
+                <p class="row-title">当前服务</p>
+                <p class="row-detail" id="serviceSummary">可随时检测当前服务。</p>
+              </div>
+              <button class="text-button" id="checkButton" onclick="checkService()">检测</button>
+            </div>
+          </section>
+
+          <section class="service-status" id="serviceStatusBox" role="status" aria-live="polite">
+            <p class="status-title" id="serviceStatusTitle"></p>
+            <p class="status-detail" id="serviceStatusDetail"></p>
+          </section>
         </div>
       </main>
 
@@ -443,26 +456,26 @@ export function renderHomePage() {
           button.innerText = isLoading ? loadingText : defaultText;
         }
 
-        function hideNotice() {
-          const noticeBox = document.getElementById('noticeBox');
-          const noticeTitle = document.getElementById('noticeTitle');
-          const noticeDetail = document.getElementById('noticeDetail');
+        function hideStatus(kind) {
+          const statusBox = document.getElementById(kind + 'StatusBox');
+          const statusTitle = document.getElementById(kind + 'StatusTitle');
+          const statusDetail = document.getElementById(kind + 'StatusDetail');
 
-          noticeBox.style.display = 'none';
-          noticeBox.className = 'notice';
-          noticeTitle.innerText = '';
-          noticeDetail.innerText = '';
+          statusBox.style.display = 'none';
+          statusBox.className = kind + '-status';
+          statusTitle.innerText = '';
+          statusDetail.innerText = '';
         }
 
-        function showNotice(type, title, detail) {
-          const noticeBox = document.getElementById('noticeBox');
-          const noticeTitle = document.getElementById('noticeTitle');
-          const noticeDetail = document.getElementById('noticeDetail');
+        function showStatus(kind, type, title, detail) {
+          const statusBox = document.getElementById(kind + 'StatusBox');
+          const statusTitle = document.getElementById(kind + 'StatusTitle');
+          const statusDetail = document.getElementById(kind + 'StatusDetail');
 
-          noticeBox.className = 'notice notice-' + type;
-          noticeTitle.innerText = title;
-          noticeDetail.innerText = detail || '';
-          noticeBox.style.display = 'block';
+          statusBox.className = kind + '-status status-' + type;
+          statusTitle.innerText = title;
+          statusDetail.innerText = detail || '';
+          statusBox.style.display = 'block';
         }
 
         function hideResult() {
@@ -512,11 +525,11 @@ export function renderHomePage() {
           const generateButton = document.getElementById('generateButton');
           const linkText = document.getElementById('linkText');
 
-          hideNotice();
+          hideStatus('account');
           hideResult();
 
           if (!user) {
-            showNotice('error', '请输入账号或邮箱', '确认输入后再获取链接。');
+            showStatus('account', 'error', '请输入账号或邮箱', '确认输入后再获取链接。');
             return;
           }
 
@@ -528,9 +541,9 @@ export function renderHomePage() {
 
             if (!response.ok) {
               if (response.status === 404) {
-                showNotice('error', '未找到账户', '请检查账号或邮箱是否正确。');
+                showStatus('account', 'error', '未找到账户', '请检查账号或邮箱是否正确。');
               } else {
-                showNotice('error', '暂时无法获取链接', data.message || '请稍后重试。');
+                showStatus('account', 'error', '暂时无法获取链接', data.message || '请稍后重试。');
               }
               return;
             }
@@ -538,7 +551,7 @@ export function renderHomePage() {
             linkText.innerText = data.link;
             document.getElementById('resultBox').style.display = 'block';
           } catch (err) {
-            showNotice('error', '暂时无法获取链接', '请稍后重试。');
+            showStatus('account', 'error', '暂时无法获取链接', '请稍后重试。');
           } finally {
             setButtonLoading(generateButton, false, '获取中', '获取');
           }
@@ -548,7 +561,7 @@ export function renderHomePage() {
           const checkButton = document.getElementById('checkButton');
           const serviceSummary = document.getElementById('serviceSummary');
 
-          hideNotice();
+          hideStatus('service');
           setButtonLoading(checkButton, true, '检测中', '检测');
           serviceSummary.innerText = '正在检测服务。';
 
@@ -558,10 +571,10 @@ export function renderHomePage() {
             const normalized = normalizeServiceMessage(data.status, response.ok, data.message);
 
             serviceSummary.innerText = normalized.title;
-            showNotice(normalized.type, normalized.title, normalized.detail);
+            showStatus('service', normalized.type, normalized.title, normalized.detail);
           } catch (err) {
             serviceSummary.innerText = '检测暂不可用';
-            showNotice('unavailable', '检测暂不可用', '请稍后重试。');
+            showStatus('service', 'unavailable', '检测暂不可用', '请稍后重试。');
           } finally {
             setButtonLoading(checkButton, false, '检测中', '检测');
           }
