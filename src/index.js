@@ -57,6 +57,12 @@ export default {
         return jsonResponse({ message: "用户不存在或输入错误。" }, { status: 404 });
       }
 
+      try {
+        convertOutlineKeyToJson(outlineKey);
+      } catch (e) {
+        return jsonResponse({ message: "用户配置异常，请联系管理员。" }, { status: 500 });
+      }
+
       return jsonResponse({
         link: buildSubscriptionLink(requestUrl.host, userId),
       });

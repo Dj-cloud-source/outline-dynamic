@@ -58,6 +58,19 @@ test("/api/link returns subscription links and hides unknown users", async () =>
   });
 });
 
+test("/api/link rejects invalid Outline key values before generating links", async () => {
+  const env = makeEnv({
+    broken: "not-a-valid-outline-key",
+  });
+
+  const response = await worker.fetch(new Request("https://wenj.online/api/link?user=broken"), env);
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    message: "用户配置异常，请联系管理员。",
+  });
+});
+
 test("subscription endpoint converts Outline keys to JSON", async () => {
   const env = makeEnv({
     wenju2: makeOutlineKey(),
