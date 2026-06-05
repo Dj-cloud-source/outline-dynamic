@@ -4,7 +4,8 @@ import {
   buildSubscriptionLink,
   convertOutlineKeyToJson,
   getOutlineKey,
-  getUserIdFromPath
+  getUserIdFromPath,
+  isReservedUserId
 } from "./outline-subscription.js";
 
 function htmlResponse(html, init = {}) {
@@ -45,6 +46,11 @@ export default {
     // 校验用户名是否存在，存在才给前端返回订阅链接。
     if (path === '/api/link') {
       const userId = (requestUrl.searchParams.get('user') || '').trim();
+
+      if (isReservedUserId(userId)) {
+        return jsonResponse({ message: "用户不存在或输入错误。" }, { status: 404 });
+      }
+
       const outlineKey = await getOutlineKey(env, userId);
 
       if (!outlineKey) {
@@ -71,6 +77,11 @@ export default {
     // ========================================================
     // 提取用户名 (例如从 /zhangsan 提取出 zhangsan)
     const userId = getUserIdFromPath(path);
+
+    if (isReservedUserId(userId)) {
+      return new Response("用户不存在或链接错误", { status: 404 });
+    }
+
     const outlineKey = await getOutlineKey(env, userId);
 
     if (!outlineKey) {

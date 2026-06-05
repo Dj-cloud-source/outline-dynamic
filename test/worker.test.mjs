@@ -130,6 +130,54 @@ test("/api/check reports healthy service without exposing target", async (t) => 
   });
 });
 
+test("health_check is reserved from public subscription access", async (t) => {
+  const env = makeEnv({
+    health_check: makeOutlineKey(),
+  });
+
+  withMockFetch(t, async (url) => {
+    if (String(url) === "https://api.check-host.cc/tcp") {
+      return jsonResponse({
+        success: true,
+        uuid: "reserved-check",
+      });
+    }
+
+    if (String(url) === "https://api.check-host.cc/report/reserved-check") {
+      return jsonResponse({
+        data: {
+          "CN-BJ-Test": {
+            checks: [
+              {
+                status: 1,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  let response = await worker.fetch(new Request("https://wenj.online/api/link?user=health_check"), env);
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), {
+    message: "用户不存在或输入错误。",
+  });
+
+  response = await worker.fetch(new Request("https://wenj.online/health_check"), env);
+  assert.equal(response.status, 404);
+  assert.equal(await response.text(), "用户不存在或链接错误");
+
+  response = await worker.fetch(new Request("https://wenj.online/api/check"), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    status: "ok",
+    message: "当前服务连通性正常。",
+  });
+});
+
 test("/api/check reports warning when China TCP nodes fail", async (t) => {
   const env = makeEnv({
     health_check: makeOutlineKey(),

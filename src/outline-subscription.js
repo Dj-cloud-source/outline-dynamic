@@ -2,12 +2,18 @@
 // KV 示例：
 // Key: zhangsan
 // Value: ss://完整密钥
+const RESERVED_USER_IDS = new Set(["health_check"]);
+
 export async function getOutlineKey(env = {}, userId) {
   if (!userId || !env.OUTLINE_USERS) {
     return null;
   }
 
   return await env.OUTLINE_USERS.get(userId);
+}
+
+export function isReservedUserId(userId) {
+  return RESERVED_USER_IDS.has(userId);
 }
 
 export function getUserIdFromPath(path) {
