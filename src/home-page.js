@@ -15,7 +15,6 @@ export function renderHomePage() {
           --text: #1c1c1e;
           --muted: #6e6e73;
           --line: #d1d1d6;
-          --soft-line: #e5e5ea;
           --blue: #007aff;
           --blue-dark: #0063cc;
           --green: #248a3d;
@@ -27,190 +26,249 @@ export function renderHomePage() {
           box-sizing: border-box;
         }
 
+        html,
+        body {
+          width: 100%;
+          overflow-x: hidden;
+        }
+
         body {
           min-height: 100vh;
           margin: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 24px 14px;
+          padding: 58px 0 36px;
           background: var(--page-bg);
           color: var(--text);
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
-        .shell {
-          width: min(100%, 430px);
+        .page {
+          width: calc(100vw - 40px);
+          max-width: 640px;
+          margin: 0 auto;
         }
 
-        .panel {
-          width: 100%;
-          padding: 28px;
-          border: 1px solid rgba(0, 0, 0, 0.05);
-          border-radius: 8px;
-          background: var(--surface);
-          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
-        }
-
-        .app-header {
+        .product-header {
           display: grid;
-          grid-template-columns: 74px 1fr;
-          gap: 16px;
+          grid-template-columns: 92px minmax(0, 1fr) auto;
+          gap: 18px;
           align-items: center;
-          padding-bottom: 22px;
-          border-bottom: 1px solid var(--soft-line);
+          padding: 4px 2px 28px;
+          border-bottom: 1px solid var(--line);
         }
 
-        .app-icon {
-          width: 74px;
-          height: 74px;
+        .icon {
+          width: 92px;
+          height: 92px;
           display: grid;
           place-items: center;
-          border-radius: 18px;
+          border-radius: 8px;
           background:
-            radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.62), transparent 28%),
-            linear-gradient(145deg, #1b8cff 0%, #3157d5 58%, #6247d6 100%);
+            radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.66), transparent 26%),
+            linear-gradient(145deg, #1d8cff 0%, #3355d9 62%, #5b4fd8 100%);
           color: #ffffff;
-          font-size: 34px;
+          font-size: 42px;
           font-weight: 700;
           line-height: 1;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 10px 22px rgba(0, 122, 255, 0.24);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34), 0 12px 24px rgba(0, 82, 180, 0.18);
         }
 
-        .app-title {
+        .title {
           margin: 0;
-          font-size: 26px;
-          line-height: 1.08;
+          font-size: 30px;
+          line-height: 1.04;
           font-weight: 700;
+          letter-spacing: 0;
         }
 
-        .app-subtitle {
-          margin: 6px 0 0;
+        .subtitle {
+          margin: 7px 0 0;
           color: var(--muted);
-          font-size: 15px;
+          font-size: 17px;
           line-height: 1.35;
         }
 
-        .form-area {
-          padding-top: 22px;
+        .meta-line {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+          color: #8e8e93;
+          font-size: 12px;
+          line-height: 1;
         }
 
-        label {
-          display: block;
-          margin-bottom: 8px;
-          color: var(--muted);
-          font-size: 13px;
+        .meta-line span:not(:first-child)::before {
+          content: "";
+          display: inline-block;
+          width: 3px;
+          height: 3px;
+          margin-right: 8px;
+          vertical-align: 3px;
+          border-radius: 50%;
+          background: #c7c7cc;
+        }
+
+        button {
+          border: 0;
+          cursor: pointer;
+          font-family: inherit;
+          font-weight: 700;
+          white-space: nowrap;
+          transition: background-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+        }
+
+        button:disabled {
+          cursor: default;
+          opacity: 0.58;
+        }
+
+        .get-button {
+          min-width: 76px;
+          height: 32px;
+          padding: 0 18px;
+          border-radius: 999px;
+          background: var(--blue);
+          color: #ffffff;
+          font-size: 15px;
+          letter-spacing: 0;
+        }
+
+        .get-button:hover {
+          background: var(--blue-dark);
+        }
+
+        .content {
+          display: grid;
+          gap: 18px;
+          padding-top: 24px;
+        }
+
+        .section-label {
+          margin: 0 0 8px 2px;
+          color: #8e8e93;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0;
+        }
+
+        .group {
+          border-radius: 8px;
+          border: 1px solid rgba(0, 0, 0, 0.04);
+          background: rgba(255, 255, 255, 0.82);
+          overflow: hidden;
+          backdrop-filter: blur(18px);
+        }
+
+        .field-row {
+          display: grid;
+          grid-template-columns: 116px minmax(0, 1fr);
+          align-items: center;
+          min-height: 58px;
+          padding: 0 16px;
+        }
+
+        .field-label {
+          color: var(--text);
+          font-size: 15px;
           font-weight: 600;
         }
 
         input {
           width: 100%;
-          height: 48px;
-          padding: 0 14px;
-          border: 1px solid var(--line);
-          border-radius: 8px;
+          min-width: 0;
+          height: 40px;
+          border: 0;
           outline: none;
-          background: #ffffff;
+          background: transparent;
           color: var(--text);
           font-size: 16px;
-          transition: border-color 0.16s ease, box-shadow 0.16s ease;
         }
 
-        input:focus {
-          border-color: var(--blue);
-          box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14);
+        input::placeholder {
+          color: #a4a4aa;
         }
 
-        .actions {
+        .service-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 14px;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 16px;
+          align-items: center;
+          min-height: 68px;
+          padding: 12px 16px;
         }
 
-        button {
-          height: 44px;
-          border: 0;
-          border-radius: 999px;
-          cursor: pointer;
-          font-size: 15px;
-          font-weight: 700;
-          transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
-        }
-
-        button:hover {
-          transform: translateY(-1px);
-        }
-
-        button:disabled {
-          cursor: default;
-          opacity: 0.62;
-          transform: none;
-        }
-
-        .primary-btn {
-          background: var(--blue);
-          color: #ffffff;
-        }
-
-        .primary-btn:hover {
-          background: var(--blue-dark);
-        }
-
-        .secondary-btn {
-          background: #e8f1ff;
-          color: #0057b8;
-        }
-
-        .secondary-btn:hover {
-          background: #dceaff;
-        }
-
-        .message,
-        .result-box {
-          display: none;
-          margin-top: 18px;
-          padding-top: 18px;
-          border-top: 1px solid var(--soft-line);
-        }
-
-        .message-title,
-        .result-title {
+        .row-title {
           margin: 0;
+          color: var(--text);
           font-size: 15px;
-          font-weight: 700;
+          font-weight: 600;
+        }
+
+        .row-detail {
+          margin: 4px 0 0;
+          color: var(--muted);
+          font-size: 13px;
           line-height: 1.4;
         }
 
-        .message-detail,
+        .text-button {
+          height: 32px;
+          padding: 0 4px;
+          background: transparent;
+          color: var(--blue);
+          font-size: 15px;
+        }
+
+        .text-button:hover {
+          color: var(--blue-dark);
+        }
+
+        .notice,
+        .result {
+          display: none;
+          border-radius: 8px;
+          border: 1px solid rgba(0, 0, 0, 0.04);
+          background: var(--surface);
+          padding: 16px;
+        }
+
+        .notice-title,
+        .result-title {
+          margin: 0;
+          color: var(--text);
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+
+        .notice-detail,
         .result-detail {
-          margin: 4px 0 0;
+          margin: 5px 0 0;
           color: var(--muted);
           font-size: 13px;
           line-height: 1.45;
         }
 
-        .message-ok .message-title {
+        .notice-ok .notice-title {
           color: var(--green);
         }
 
-        .message-warning .message-title {
+        .notice-warning .notice-title {
           color: var(--amber);
         }
 
-        .message-error .message-title,
-        .message-unavailable .message-title {
+        .notice-error .notice-title,
+        .notice-unavailable .notice-title {
           color: var(--red);
         }
 
-        .link-value {
-          margin-top: 12px;
+        .link-box {
+          margin-top: 14px;
           padding: 12px;
-          border: 1px solid var(--soft-line);
           border-radius: 8px;
-          background: #f9f9fb;
+          background: #f2f2f7;
           color: #26262a;
-          font-size: 13px;
+          font-size: 12px;
           line-height: 1.45;
           word-break: break-all;
         }
@@ -223,13 +281,17 @@ export function renderHomePage() {
         }
 
         .copy-btn {
-          width: 116px;
-          background: #30d158;
-          color: #ffffff;
+          min-width: 72px;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 999px;
+          background: #e8f1ff;
+          color: #0057b8;
+          font-size: 15px;
         }
 
         .copy-btn:hover {
-          background: #27b84b;
+          background: #dceaff;
         }
 
         .copy-state {
@@ -238,74 +300,141 @@ export function renderHomePage() {
           font-size: 13px;
         }
 
-        @media (max-width: 420px) {
+        @media (max-width: 560px) {
           body {
-            align-items: flex-start;
-            padding-top: 18px;
+            padding: 28px 0 28px;
           }
 
-          .panel {
-            padding: 22px;
+          .page {
+            width: calc(100vw - 32px);
           }
 
-          .app-header {
-            grid-template-columns: 64px 1fr;
-            gap: 14px;
+          .product-header {
+            grid-template-columns: 78px minmax(0, 1fr);
+            gap: 12px;
+            padding-bottom: 24px;
           }
 
-          .app-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 16px;
-            font-size: 30px;
+          .icon {
+            width: 78px;
+            height: 78px;
+            font-size: 36px;
           }
 
-          .app-title {
-            font-size: 23px;
+          .title {
+            font-size: 27px;
           }
 
-          .actions {
+          .subtitle {
+            font-size: 15px;
+          }
+
+          .meta-line {
+            display: none;
+          }
+
+          .get-button {
+            grid-column: 2;
+            justify-self: start;
+            min-width: 70px;
+            margin-top: 10px;
+            padding: 0 14px;
+          }
+
+          .field-row {
             grid-template-columns: 1fr;
+            gap: 6px;
+            align-items: start;
+            padding: 12px 16px;
+          }
+
+          input {
+            height: 34px;
+          }
+
+          .service-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            min-height: 64px;
+          }
+
+          .text-button {
+            justify-self: start;
+            height: 26px;
+            padding: 0;
+          }
+        }
+
+        @media (max-width: 350px) {
+          .product-header {
+            grid-template-columns: 66px minmax(0, 1fr);
+          }
+
+          .icon {
+            width: 66px;
+            height: 66px;
+            font-size: 31px;
+          }
+
+          .get-button {
+            margin-top: 8px;
           }
         }
       </style>
     </head>
     <body>
-      <main class="shell">
-        <section class="panel" aria-labelledby="pageTitle">
-          <div class="app-header">
-            <div class="app-icon" aria-hidden="true">C</div>
-            <div>
-              <h1 class="app-title" id="pageTitle">Client</h1>
-              <p class="app-subtitle">账户连接</p>
+      <main class="page" aria-labelledby="pageTitle">
+        <header class="product-header">
+          <div class="icon" aria-hidden="true">C</div>
+          <div>
+            <h1 class="title" id="pageTitle">Client</h1>
+            <p class="subtitle">账户连接</p>
+            <div class="meta-line" aria-hidden="true">
+              <span>账户</span>
+              <span>服务</span>
+              <span>连接</span>
             </div>
           </div>
+          <button class="get-button" id="generateButton" onclick="generateLink()">获取</button>
+        </header>
 
-          <div class="form-area">
-            <label for="username">账号或邮箱</label>
-            <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false">
-
-            <div class="actions">
-              <button class="primary-btn" id="generateButton" onclick="generateLink()">获取链接</button>
-              <button class="secondary-btn" id="checkButton" onclick="checkService()">检测服务</button>
+        <div class="content">
+          <section>
+            <p class="section-label">账户</p>
+            <div class="group">
+              <label class="field-row" for="username">
+                <span class="field-label">账号或邮箱</span>
+                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false">
+              </label>
             </div>
+          </section>
 
-            <div class="message" id="messageBox" role="status" aria-live="polite">
-              <p class="message-title" id="messageTitle"></p>
-              <p class="message-detail" id="messageDetail"></p>
-            </div>
-
-            <div class="result-box" id="resultBox">
-              <p class="result-title">连接链接已准备好</p>
-              <p class="result-detail">复制后在客户端中打开。</p>
-              <div class="link-value" id="linkText"></div>
-              <div class="copy-row">
-                <button class="copy-btn" onclick="copyLink()">复制链接</button>
-                <span class="copy-state" id="copyState"></span>
+          <section>
+            <p class="section-label">状态</p>
+            <div class="group service-row">
+              <div>
+                <p class="row-title">当前服务</p>
+                <p class="row-detail" id="serviceSummary">可随时检测当前服务。</p>
               </div>
+              <button class="text-button" id="checkButton" onclick="checkService()">检测</button>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="notice" id="noticeBox" role="status" aria-live="polite">
+            <p class="notice-title" id="noticeTitle"></p>
+            <p class="notice-detail" id="noticeDetail"></p>
+          </section>
+
+          <section class="result" id="resultBox">
+            <p class="result-title">连接链接已准备好</p>
+            <p class="result-detail">复制后在客户端中打开。</p>
+            <div class="link-box" id="linkText"></div>
+            <div class="copy-row">
+              <button class="copy-btn" onclick="copyLink()">复制</button>
+              <span class="copy-state" id="copyState"></span>
+            </div>
+          </section>
+        </div>
       </main>
 
       <script>
@@ -314,26 +443,26 @@ export function renderHomePage() {
           button.innerText = isLoading ? loadingText : defaultText;
         }
 
-        function hideMessage() {
-          const messageBox = document.getElementById('messageBox');
-          const messageTitle = document.getElementById('messageTitle');
-          const messageDetail = document.getElementById('messageDetail');
+        function hideNotice() {
+          const noticeBox = document.getElementById('noticeBox');
+          const noticeTitle = document.getElementById('noticeTitle');
+          const noticeDetail = document.getElementById('noticeDetail');
 
-          messageBox.style.display = 'none';
-          messageBox.className = 'message';
-          messageTitle.innerText = '';
-          messageDetail.innerText = '';
+          noticeBox.style.display = 'none';
+          noticeBox.className = 'notice';
+          noticeTitle.innerText = '';
+          noticeDetail.innerText = '';
         }
 
-        function showMessage(type, title, detail) {
-          const messageBox = document.getElementById('messageBox');
-          const messageTitle = document.getElementById('messageTitle');
-          const messageDetail = document.getElementById('messageDetail');
+        function showNotice(type, title, detail) {
+          const noticeBox = document.getElementById('noticeBox');
+          const noticeTitle = document.getElementById('noticeTitle');
+          const noticeDetail = document.getElementById('noticeDetail');
 
-          messageBox.className = 'message message-' + type;
-          messageTitle.innerText = title;
-          messageDetail.innerText = detail || '';
-          messageBox.style.display = 'block';
+          noticeBox.className = 'notice notice-' + type;
+          noticeTitle.innerText = title;
+          noticeDetail.innerText = detail || '';
+          noticeBox.style.display = 'block';
         }
 
         function hideResult() {
@@ -383,15 +512,15 @@ export function renderHomePage() {
           const generateButton = document.getElementById('generateButton');
           const linkText = document.getElementById('linkText');
 
-          hideMessage();
+          hideNotice();
           hideResult();
 
           if (!user) {
-            showMessage('error', '请输入账号或邮箱', '确认输入后再获取链接。');
+            showNotice('error', '请输入账号或邮箱', '确认输入后再获取链接。');
             return;
           }
 
-          setButtonLoading(generateButton, true, '获取中...', '获取链接');
+          setButtonLoading(generateButton, true, '获取中', '获取');
 
           try {
             const response = await fetch('/api/link?user=' + encodeURIComponent(user));
@@ -399,9 +528,9 @@ export function renderHomePage() {
 
             if (!response.ok) {
               if (response.status === 404) {
-                showMessage('error', '未找到账户', '请检查账号或邮箱是否正确。');
+                showNotice('error', '未找到账户', '请检查账号或邮箱是否正确。');
               } else {
-                showMessage('error', '暂时无法获取链接', data.message || '请稍后重试。');
+                showNotice('error', '暂时无法获取链接', data.message || '请稍后重试。');
               }
               return;
             }
@@ -409,29 +538,32 @@ export function renderHomePage() {
             linkText.innerText = data.link;
             document.getElementById('resultBox').style.display = 'block';
           } catch (err) {
-            showMessage('error', '暂时无法获取链接', '请稍后重试。');
+            showNotice('error', '暂时无法获取链接', '请稍后重试。');
           } finally {
-            setButtonLoading(generateButton, false, '获取中...', '获取链接');
+            setButtonLoading(generateButton, false, '获取中', '获取');
           }
         }
 
         async function checkService() {
           const checkButton = document.getElementById('checkButton');
+          const serviceSummary = document.getElementById('serviceSummary');
 
-          hideMessage();
-          setButtonLoading(checkButton, true, '检测中...', '检测服务');
-          showMessage('warning', '正在检测服务', '通常需要几秒钟。');
+          hideNotice();
+          setButtonLoading(checkButton, true, '检测中', '检测');
+          serviceSummary.innerText = '正在检测服务。';
 
           try {
             const response = await fetch('/api/check');
             const data = await response.json();
             const normalized = normalizeServiceMessage(data.status, response.ok, data.message);
 
-            showMessage(normalized.type, normalized.title, normalized.detail);
+            serviceSummary.innerText = normalized.title;
+            showNotice(normalized.type, normalized.title, normalized.detail);
           } catch (err) {
-            showMessage('unavailable', '检测暂不可用', '请稍后重试。');
+            serviceSummary.innerText = '检测暂不可用';
+            showNotice('unavailable', '检测暂不可用', '请稍后重试。');
           } finally {
-            setButtonLoading(checkButton, false, '检测中...', '检测服务');
+            setButtonLoading(checkButton, false, '检测中', '检测');
           }
         }
 
