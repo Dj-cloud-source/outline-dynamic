@@ -5,6 +5,9 @@ const CHECK_HOST_API_BASE = "https://api.check-host.cc";
 const CHECK_REGION = ["CN"];
 const CHECK_POLL_ATTEMPTS = 5;
 const CHECK_POLL_DELAY_MS = 800;
+const CHECK_REQUEST_TIMEOUT_MS = 3000;
+const CHECK_CACHE_KEY = "health_check_status";
+const CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -51,18 +54,44 @@ function buildConnectivityResult(summary) {
   }
 
   if (summary.reachable === 0) {
-    return publicResult("warning", "当前服务疑似异常，请联系管理员。");
+    return publicResult("warning", "当前服务大陆连通性参考异常，请联系管理员。");
   }
 
   if (summary.failed > 0) {
     return publicResult("warning", "当前服务部分地区可达，连通性不稳定。");
   }
 
-  return publicResult("ok", "当前服务连通性正常。");
+  return publicResult("ok", "当前服务大陆连通性参考正常。");
 }
 
-async function dispatchTcpCheck(fetchImpl, target) {
-  const response = await fetchImpl(`${CHECK_HOST_API_BASE}/tcp`, {
+function getTargetCacheKey(target) {
+  return `${target.host}:${target.port}`;
+}
+
+async function fetchWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  let timeoutId;
+
+  try {
+    return await Promise.race([
+      fetchImpl(url, {
+        ...init,
+        signal: controller.signal,
+      }),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Request timed out"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function dispatchTcpCheck(fetchImpl, target, requestTimeoutMs) {
+  const response = await fetchWithTimeout(fetchImpl, `${CHECK_HOST_API_BASE}/tcp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -72,7 +101,7 @@ async function dispatchTcpCheck(fetchImpl, target) {
       port: target.port,
       region: CHECK_REGION,
     }),
-  });
+  }, requestTimeoutMs);
 
   if (!response.ok) {
     return null;
@@ -82,7 +111,7 @@ async function dispatchTcpCheck(fetchImpl, target) {
   return data?.success && data?.uuid ? data.uuid : null;
 }
 
-async function pollTcpReport(fetchImpl, uuid) {
+async function pollTcpReport(fetchImpl, uuid, requestTimeoutMs) {
   let latestCompletedSummary = null;
 
   for (let attempt = 0; attempt < CHECK_POLL_ATTEMPTS; attempt += 1) {
@@ -90,7 +119,7 @@ async function pollTcpReport(fetchImpl, uuid) {
       await delay(CHECK_POLL_DELAY_MS);
     }
 
-    const response = await fetchImpl(`${CHECK_HOST_API_BASE}/report/${uuid}`);
+    const response = await fetchWithTimeout(fetchImpl, `${CHECK_HOST_API_BASE}/report/${uuid}`, {}, requestTimeoutMs);
 
     if (!response.ok) {
       continue;
@@ -115,8 +144,57 @@ async function pollTcpReport(fetchImpl, uuid) {
   return publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
 }
 
+async function readCachedResult(env, target, now) {
+  if (!env.OUTLINE_META?.get) {
+    return null;
+  }
+
+  try {
+    const rawCachedResult = await env.OUTLINE_META.get(CHECK_CACHE_KEY);
+
+    if (!rawCachedResult) {
+      return null;
+    }
+
+    const cachedResult = JSON.parse(rawCachedResult);
+    const isFresh = typeof cachedResult.checkedAt === "number"
+      && now - cachedResult.checkedAt <= CHECK_CACHE_TTL_MS;
+    const matchesTarget = cachedResult.target === getTargetCacheKey(target);
+    const hasPublicShape = typeof cachedResult.status === "string"
+      && typeof cachedResult.message === "string";
+
+    if (!isFresh || !matchesTarget || !hasPublicShape) {
+      return null;
+    }
+
+    return publicResult(cachedResult.status, cachedResult.message, cachedResult.httpStatus || 200);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function writeCachedResult(env, target, result, now) {
+  if (!env.OUTLINE_META?.put || result.httpStatus !== 200) {
+    return;
+  }
+
+  try {
+    await env.OUTLINE_META.put(CHECK_CACHE_KEY, JSON.stringify({
+      status: result.status,
+      message: result.message,
+      httpStatus: result.httpStatus,
+      checkedAt: now,
+      target: getTargetCacheKey(target),
+    }));
+  } catch (e) {
+    // 缓存失败不影响本次检测结果。
+  }
+}
+
 export async function checkCurrentService(env = {}, options = {}) {
   const fetchImpl = options.fetch || fetch;
+  const now = options.now || Date.now();
+  const requestTimeoutMs = options.requestTimeoutMs || CHECK_REQUEST_TIMEOUT_MS;
   const outlineKey = await getOutlineKey(env, HEALTH_CHECK_KEY);
 
   if (!outlineKey) {
@@ -135,14 +213,23 @@ export async function checkCurrentService(env = {}, options = {}) {
     return publicResult("unavailable", "当前服务检测配置异常，请联系管理员。", 500);
   }
 
+  const cachedResult = await readCachedResult(env, target, now);
+
+  if (cachedResult) {
+    return cachedResult;
+  }
+
   try {
-    const uuid = await dispatchTcpCheck(fetchImpl, target);
+    const uuid = await dispatchTcpCheck(fetchImpl, target, requestTimeoutMs);
 
     if (!uuid) {
       return publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
     }
 
-    return await pollTcpReport(fetchImpl, uuid);
+    const result = await pollTcpReport(fetchImpl, uuid, requestTimeoutMs);
+    await writeCachedResult(env, target, result, now);
+
+    return result;
   } catch (e) {
     return publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
   }

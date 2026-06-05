@@ -2,18 +2,30 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index.js";
+import { checkCurrentService } from "../src/service-check.js";
 
 function makeOutlineKey(host = "104.248.220.53", port = 50440) {
   const encodedUserInfo = btoa("chacha20-ietf-poly1305:testpass").replace(/=/g, "");
   return `ss://${encodedUserInfo}@${host}:${port}/?outline=1`;
 }
 
-function makeEnv(records) {
-  return {
+function makeEnv(records, metaRecords = null) {
+  const env = {
     OUTLINE_USERS: {
       get: async (key) => records[key] || null,
     },
   };
+
+  if (metaRecords) {
+    env.OUTLINE_META = {
+      get: async (key) => metaRecords[key] || null,
+      put: async (key, value) => {
+        metaRecords[key] = value;
+      },
+    };
+  }
+
+  return env;
 }
 
 function jsonResponse(data, status = 200) {
@@ -92,9 +104,10 @@ test("subscription endpoint converts Outline keys to JSON", async () => {
 });
 
 test("/api/check reports healthy service without exposing target", async (t) => {
+  const metaRecords = {};
   const env = makeEnv({
     health_check: makeOutlineKey(),
-  });
+  }, metaRecords);
   const fetchCalls = [];
 
   withMockFetch(t, async (url, init) => {
@@ -131,7 +144,7 @@ test("/api/check reports healthy service without exposing target", async (t) => 
   assert.equal(response.status, 200);
   assert.deepEqual(body, {
     status: "ok",
-    message: "当前服务连通性正常。",
+    message: "当前服务大陆连通性参考正常。",
   });
   assert.equal(JSON.stringify(body).includes("104.248.220.53"), false);
 
@@ -141,6 +154,7 @@ test("/api/check reports healthy service without exposing target", async (t) => 
     port: 50440,
     region: ["CN"],
   });
+  assert.equal(typeof metaRecords.health_check_status, "string");
 });
 
 test("health_check is reserved from public subscription access", async (t) => {
@@ -187,7 +201,103 @@ test("health_check is reserved from public subscription access", async (t) => {
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     status: "ok",
-    message: "当前服务连通性正常。",
+    message: "当前服务大陆连通性参考正常。",
+  });
+});
+
+test("/api/check returns cached status from OUTLINE_META without calling third-party API", async (t) => {
+  const env = makeEnv({
+    health_check: makeOutlineKey(),
+  }, {
+    health_check_status: JSON.stringify({
+      status: "ok",
+      message: "当前服务大陆连通性参考正常。",
+      httpStatus: 200,
+      checkedAt: Date.now(),
+      target: "104.248.220.53:50440",
+    }),
+  });
+  let fetchCalled = false;
+
+  withMockFetch(t, async () => {
+    fetchCalled = true;
+    throw new Error("fetch should not be called on cache hit");
+  });
+
+  const response = await worker.fetch(new Request("https://wenj.online/api/check"), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body, {
+    status: "ok",
+    message: "当前服务大陆连通性参考正常。",
+  });
+  assert.equal(fetchCalled, false);
+  assert.equal(JSON.stringify(body).includes("104.248.220.53"), false);
+});
+
+test("/api/check reports unstable service when China TCP nodes are partially reachable", async (t) => {
+  const env = makeEnv({
+    health_check: makeOutlineKey(),
+  });
+
+  withMockFetch(t, async (url) => {
+    if (String(url) === "https://api.check-host.cc/tcp") {
+      return jsonResponse({
+        success: true,
+        uuid: "check-partial",
+      });
+    }
+
+    if (String(url) === "https://api.check-host.cc/report/check-partial") {
+      return jsonResponse({
+        data: {
+          "CN-BJ-Test": {
+            checks: [
+              {
+                status: 1,
+              },
+            ],
+          },
+          "CN-SH-Test": {
+            checks: [
+              {
+                status: 0,
+                errortext: "Connection timed out",
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  const response = await worker.fetch(new Request("https://wenj.online/api/check"), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body, {
+    status: "warning",
+    message: "当前服务部分地区可达，连通性不稳定。",
+  });
+});
+
+test("service check times out slow third-party requests", async () => {
+  const env = makeEnv({
+    health_check: makeOutlineKey(),
+  });
+
+  const result = await checkCurrentService(env, {
+    requestTimeoutMs: 10,
+    fetch: async () => new Promise(() => {}),
+  });
+
+  assert.deepEqual(result, {
+    status: "unavailable",
+    message: "检测暂不可用，请稍后重试。",
+    httpStatus: 503,
   });
 });
 
@@ -228,7 +338,7 @@ test("/api/check reports warning when China TCP nodes fail", async (t) => {
   assert.equal(response.status, 200);
   assert.deepEqual(body, {
     status: "warning",
-    message: "当前服务疑似异常，请联系管理员。",
+    message: "当前服务大陆连通性参考异常，请联系管理员。",
   });
   assert.equal(JSON.stringify(body).includes("104.248.220.53"), false);
 });

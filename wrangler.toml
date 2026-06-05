@@ -5,3 +5,7 @@ compatibility_date = "2026-06-03"
 [[kv_namespaces]]
 binding = "OUTLINE_USERS"
 id = "4397c674c35e45cf98c054ea0d3cb4dd"
+
+[[kv_namespaces]]
+binding = "OUTLINE_META"
+id = "3895804d0f774122871bfa5078fc4453"
