@@ -155,7 +155,13 @@ async function pollTcpReport(fetchImpl, uuid, requestTimeoutMs) {
       continue;
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      continue;
+    }
+
     const summary = summarizeTcpReport(data);
 
     if (summary.reachable > 0) {

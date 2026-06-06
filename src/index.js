@@ -8,11 +8,19 @@ import {
   isReservedUserId
 } from "./outline-subscription.js";
 
+function securityHeaders(headers) {
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "no-referrer");
+  headers.set("Strict-Transport-Security", "max-age=31536000");
+}
+
 function htmlResponse(html, init = {}) {
   const headers = new Headers(init.headers || {});
   headers.set("Content-Type", "text/html; charset=utf-8");
   headers.set("Cache-Control", "no-store");
   headers.set("X-Robots-Tag", "noindex, nofollow");
+  securityHeaders(headers);
 
   return new Response(html, {
     ...init,
@@ -24,6 +32,7 @@ function jsonResponse(data, init = {}) {
   const headers = new Headers(init.headers || {});
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
+  securityHeaders(headers);
 
   return new Response(JSON.stringify(data), {
     ...init,
@@ -85,26 +94,26 @@ export default {
     const userId = getUserIdFromPath(path);
 
     if (!userId || isReservedUserId(userId)) {
-      return new Response("用户不存在或链接错误", { status: 404 });
+      return jsonResponse({ message: "用户不存在或链接错误。" }, { status: 404 });
     }
 
     const outlineKey = await getOutlineKey(env, userId);
 
     if (!outlineKey) {
-      return new Response("用户不存在或链接错误", { status: 404 });
+      return jsonResponse({ message: "用户不存在或链接错误。" }, { status: 404 });
     }
 
     try {
       const outlineJson = convertOutlineKeyToJson(outlineKey);
 
-      return new Response(JSON.stringify(outlineJson, null, 2), {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-        },
-      });
+      const headers = new Headers();
+      headers.set("Content-Type", "application/json; charset=utf-8");
+      headers.set("Cache-Control", "no-store");
+      securityHeaders(headers);
+
+      return new Response(JSON.stringify(outlineJson, null, 2), { headers });
     } catch (e) {
-      return new Response("配置解析错误", { status: 500 });
+      return jsonResponse({ message: "配置解析错误，请联系管理员。" }, { status: 500 });
     }
   }
 };

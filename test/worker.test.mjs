@@ -3,6 +3,7 @@ import test from "node:test";
 
 import worker from "../src/index.js";
 import { checkCurrentService } from "../src/service-check.js";
+import { getUserIdFromPath } from "../src/outline-subscription.js";
 
 const TEST_HOST = "203.0.113.10";
 const TEST_PORT = 50440;
@@ -33,8 +34,36 @@ function makeInvalidOutlineKeys() {
     ["missing separator", makeOutlineKey(TEST_HOST, TEST_PORT, "chacha20-ietf-poly1305")],
     ["missing method", makeOutlineKey(TEST_HOST, TEST_PORT, ":testpass")],
     ["missing password", makeOutlineKey(TEST_HOST, TEST_PORT, "chacha20-ietf-poly1305:")],
+    ["empty hostname", `ss://${encodedUserInfo}@:${TEST_PORT}/?outline=1`],
+    ["non-numeric port", `ss://${encodedUserInfo}@${TEST_HOST}:abc/?outline=1`],
+    ["empty credentials", `ss://@${TEST_HOST}:${TEST_PORT}/?outline=1`],
   ];
 }
+
+test("/api/link handles Outline keys with malformed percent-encoding in credentials", async () => {
+  const env = makeEnv({
+    broken: makeOutlineKeyWithEncodedUserInfo("%"),
+  });
+  const response = await worker.fetch(new Request("https://wenj.online/api/link?user=broken"), env);
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    message: "用户配置异常，请联系管理员。",
+  });
+});
+
+test("subscription endpoint handles URL-safe base64 encoding (- and _)", async () => {
+  const urlSafeUnderscore = "dGVzdDphYmM_MTIz";
+  const env1 = makeEnv({ u1: makeOutlineKeyWithEncodedUserInfo(urlSafeUnderscore) });
+  let r = await worker.fetch(new Request("https://wenj.online/u1"), env1);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { server: TEST_HOST, server_port: TEST_PORT, password: "abc?123", method: "test" });
+
+  const urlSafeDash = "dGVzdDphYmM-MTIz";
+  const env2 = makeEnv({ u2: makeOutlineKeyWithEncodedUserInfo(urlSafeDash) });
+  r = await worker.fetch(new Request("https://wenj.online/u2"), env2);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { server: TEST_HOST, server_port: TEST_PORT, password: "abc>123", method: "test" });
+});
 
 function makeEnv(records, metaRecords = null) {
   const env = {
@@ -210,7 +239,7 @@ test("subscription endpoint rejects malformed Outline key variants", async () =>
     const response = await worker.fetch(new Request("https://wenj.online/broken"), env);
 
     assert.equal(response.status, 500, name);
-    assert.equal(await response.text(), "配置解析错误", name);
+    assert.deepEqual(await response.json(), { message: "配置解析错误，请联系管理员。" }, name);
   }
 });
 
@@ -218,7 +247,7 @@ test("subscription endpoint rejects malformed encoded paths", async () => {
   const response = await worker.fetch(new Request("https://wenj.online/%E0%A4%A"), makeEnv({}));
 
   assert.equal(response.status, 404);
-  assert.equal(await response.text(), "用户不存在或链接错误");
+  assert.deepEqual(await response.json(), { message: "用户不存在或链接错误。" });
 });
 
 test("KV read failures are handled without exposing internal errors", async (t) => {
@@ -244,7 +273,7 @@ test("KV read failures are handled without exposing internal errors", async (t) 
 
   response = await worker.fetch(new Request("https://wenj.online/wenju2"), env);
   assert.equal(response.status, 404);
-  assert.equal(await response.text(), "用户不存在或链接错误");
+  assert.deepEqual(await response.json(), { message: "用户不存在或链接错误。" });
 
   response = await worker.fetch(new Request("https://wenj.online/api/check"), env);
   assert.equal(response.status, 503);
@@ -347,7 +376,7 @@ test("health_check is reserved from public subscription access", async (t) => {
 
   response = await worker.fetch(new Request("https://wenj.online/health_check"), env);
   assert.equal(response.status, 404);
-  assert.equal(await response.text(), "用户不存在或链接错误");
+  assert.deepEqual(await response.json(), { message: "用户不存在或链接错误。" });
 
   response = await worker.fetch(new Request("https://wenj.online/api/check"), env);
   assert.equal(response.status, 200);
@@ -658,4 +687,8 @@ test("/api/check returns unavailable when health_check is missing", async (t) =>
     message: "当前服务检测未配置，请联系管理员。",
   });
   assert.equal(fetchCalled, false);
+});
+
+test("getUserIdFromPath returns null for root path /", () => {
+  assert.equal(getUserIdFromPath("/"), null);
 });

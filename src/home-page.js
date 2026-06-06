@@ -5,8 +5,16 @@ export function renderHomePage() {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="description" content="为 Outline VPN 生成账户订阅连接链接，检测服务状态，一键复制到客户端。">
+      <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
+      <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#050506">
+      <meta property="og:title" content="Outline 订阅连接">
+      <meta property="og:description" content="为 Outline VPN 生成账户订阅连接链接，检测服务状态，一键复制到客户端。">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="Outline 订阅连接">
       <meta name="robots" content="noindex,nofollow">
-      <title>Client</title>
+      <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f5dd42' stroke='%23d4a017' stroke-width='3'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='%23d4a017' stroke-width='2'/%3E%3Ccircle cx='50' cy='36' r='4' fill='%23b8860b'/%3E%3Cpath d='M26 66 L36 56 L44 62 L56 48 L70 60 L74 56 L54 38 L46 44 L38 38 L24 52' fill='none' stroke='%23b8860b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+      <title>Outline 订阅连接</title>
       <style>
         :root {
           color-scheme: light dark;
@@ -306,8 +314,8 @@ export function renderHomePage() {
           border-radius: 8px;
           background: var(--link-bg);
           color: var(--link-text);
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 14px;
+          line-height: 1.5;
           word-break: break-all;
         }
 
@@ -336,6 +344,12 @@ export function renderHomePage() {
           min-height: 20px;
           color: var(--muted);
           font-size: 13px;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+        }
+
+        .copy-state--visible {
+          opacity: 1;
         }
 
         @media (max-width: 560px) {
@@ -565,6 +579,40 @@ export function renderHomePage() {
           };
         }
 
+        function execCommandFallback(text) {
+          var textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.left = "-9999px";
+          textarea.style.top = "-9999px";
+          textarea.style.width = "1px";
+          textarea.style.height = "1px";
+          textarea.style.padding = "0";
+          textarea.style.border = "0";
+          textarea.setAttribute("readonly", "");
+          document.body.appendChild(textarea);
+          textarea.select();
+          try {
+            document.execCommand("copy");
+          } finally {
+            document.body.removeChild(textarea);
+          }
+        }
+
+        function updateCopyState(btn, stateEl, text) {
+          if (btn._copyTimer) {
+            clearTimeout(btn._copyTimer);
+            btn._copyTimer = null;
+          }
+          stateEl.innerText = text;
+          stateEl.classList.add("copy-state--visible");
+          btn._copyTimer = setTimeout(function () {
+            stateEl.innerText = "";
+            stateEl.classList.remove("copy-state--visible");
+            btn._copyTimer = null;
+          }, 2500);
+        }
+
         async function generateLink() {
           const user = document.getElementById('username').value.trim();
           const generateButton = document.getElementById('generateButton');
@@ -627,13 +675,24 @@ export function renderHomePage() {
 
         async function copyLink() {
           const link = document.getElementById('linkText').innerText;
+          const copyBtn = document.getElementById('generateButton');
           const copyState = document.getElementById('copyState');
+
+          if (!link) {
+            updateCopyState(copyBtn, copyState, '没有可复制的内容');
+            return;
+          }
 
           try {
             await navigator.clipboard.writeText(link);
-            copyState.innerText = '已复制';
+            updateCopyState(copyBtn, copyState, '已复制');
           } catch (err) {
-            copyState.innerText = '请手动复制链接';
+            try {
+              execCommandFallback(link);
+              updateCopyState(copyBtn, copyState, '已复制');
+            } catch (fallbackErr) {
+              updateCopyState(copyBtn, copyState, '请手动复制链接');
+            }
           }
         }
       </script>

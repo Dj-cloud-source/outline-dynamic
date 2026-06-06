@@ -22,7 +22,8 @@ export function isReservedUserId(userId) {
 
 export function getUserIdFromPath(path) {
   try {
-    return decodeURIComponent(path.slice(1)).trim();
+    const decoded = decodeURIComponent(path.slice(1)).trim();
+    return decoded || null;
   } catch (e) {
     return null;
   }
