@@ -42,8 +42,9 @@ function jsonResponse(data, init = {}) {
 
 export default {
   async fetch(request, env, ctx) {
-    const requestUrl = new URL(request.url);
-    const path = requestUrl.pathname;
+    try {
+      const requestUrl = new URL(request.url);
+      const path = requestUrl.pathname;
 
     // ========================================================
     // 模块 A：如果用户访问的是首页 (根目录 /)，返回交互式网页
@@ -54,6 +55,9 @@ export default {
 
     // 校验用户名是否存在，存在才给前端返回订阅链接。
     if (path === '/api/link') {
+      if (request.method !== "GET") {
+        return jsonResponse({ message: "Method Not Allowed" }, { status: 405 });
+      }
       const userId = (requestUrl.searchParams.get('user') || '').trim();
 
       if (isReservedUserId(userId)) {
@@ -69,16 +73,21 @@ export default {
       try {
         convertOutlineKeyToJson(outlineKey);
       } catch (e) {
+        console.error("outline key validation error:", e?.message || e);
         return jsonResponse({ message: "用户配置异常，请联系管理员。" }, { status: 500 });
       }
 
       return jsonResponse({
         link: buildSubscriptionLink(requestUrl.host, userId),
+        message: "链接生成成功。",
       });
     }
 
     // 检测当前主服务连通性，不暴露真实节点地址。
     if (path === '/api/check') {
+      if (request.method !== "GET") {
+        return jsonResponse({ message: "Method Not Allowed" }, { status: 405 });
+      }
       const result = await checkCurrentService(env);
 
       return jsonResponse({
@@ -90,6 +99,10 @@ export default {
     // ========================================================
     // 模块 B：处理机器请求，下发真实的 JSON 订阅数据
     // ========================================================
+    if (request.method !== "GET") {
+      return jsonResponse({ message: "Method Not Allowed" }, { status: 405 });
+    }
+
     // 提取用户名 (例如从 /zhangsan 提取出 zhangsan)
     const userId = getUserIdFromPath(path);
 
@@ -105,15 +118,14 @@ export default {
 
     try {
       const outlineJson = convertOutlineKeyToJson(outlineKey);
-
-      const headers = new Headers();
-      headers.set("Content-Type", "application/json; charset=utf-8");
-      headers.set("Cache-Control", "no-store");
-      securityHeaders(headers);
-
-      return new Response(JSON.stringify(outlineJson, null, 2), { headers });
+      return jsonResponse(outlineJson);
     } catch (e) {
+      console.error("outline key parse error:", e?.message || e);
       return jsonResponse({ message: "配置解析错误，请联系管理员。" }, { status: 500 });
+    }
+    } catch (e) {
+      console.error("worker panic:", e?.message || e);
+      return jsonResponse({ message: "服务异常，请稍后重试。" }, { status: 500 });
     }
   }
 };

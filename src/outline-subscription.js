@@ -22,7 +22,8 @@ export function isReservedUserId(userId) {
 
 export function getUserIdFromPath(path) {
   try {
-    const decoded = decodeURIComponent(path.slice(1)).trim();
+    const cleaned = path.replace(/\/+$/, "").slice(1);
+    const decoded = decodeURIComponent(cleaned).trim();
     return decoded || null;
   } catch (e) {
     return null;
@@ -36,6 +37,7 @@ export function buildSubscriptionLink(host, userId) {
 
 export function getOutlineConnectionTarget(outlineKey) {
   const url = parseOutlineUrl(outlineKey);
+  // 仅校验凭据格式，不需要方法名和密码
   parseOutlineCredentials(url.username);
 
   return {

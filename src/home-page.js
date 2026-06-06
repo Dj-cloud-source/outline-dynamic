@@ -482,14 +482,14 @@ export function renderHomePage() {
       <main class="page" aria-labelledby="pageTitle">
         <header class="product-header">
           <div class="icon" aria-hidden="true">
-            <svg viewBox="0 0 100 100" role="img" aria-label="Client">
+            <svg viewBox="0 0 100 100" role="img" aria-label="Outline">
               <rect width="100" height="100" rx="18" fill="#113d2d"></rect>
               <path d="M45 25a25 25 0 0 0 0 50z" fill="#5fb89b"></path>
               <path d="M55 25a25 25 0 0 1 0 50V62a12 12 0 0 0 0-24z" fill="#ffffff"></path>
             </svg>
           </div>
           <div>
-            <h1 class="title" id="pageTitle">Client</h1>
+            <h1 class="title" id="pageTitle">Outline 订阅连接</h1>
             <p class="subtitle">账户连接</p>
             <div class="meta-line" aria-hidden="true">
               <span>账户</span>
@@ -729,7 +729,7 @@ export function renderHomePage() {
 
         async function copyLink() {
           const link = document.getElementById('linkText').innerText;
-          const copyBtn = document.getElementById('generateButton');
+          const copyBtn = document.querySelector('.copy-btn');
           const copyState = document.getElementById('copyState');
 
           if (!link) {

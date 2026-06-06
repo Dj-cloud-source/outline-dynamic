@@ -151,12 +151,14 @@ test("/api/link returns subscription links and hides unknown users", async () =>
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     link: "ssconf://wenj.online/wenju2",
+    message: "链接生成成功。",
   });
 
   response = await worker.fetch(new Request("https://wenj.online/api/link?user=haytao0726%40gmail.com"), env);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     link: "ssconf://wenj.online/haytao0726@gmail.com",
+    message: "链接生成成功。",
   });
 
   response = await worker.fetch(new Request("https://wenj.online/api/link?user=missing"), env);
@@ -192,6 +194,33 @@ test("/api/link rejects malformed Outline key variants", async () => {
       message: "用户配置异常，请联系管理员。",
     }, name);
   }
+});
+
+test("/api/link rejects non-GET methods", async () => {
+  const env = makeEnv({ wenju2: makeOutlineKey() });
+
+  let response = await worker.fetch(new Request("https://wenj.online/api/link?user=wenju2", { method: "POST" }), env);
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { message: "Method Not Allowed" });
+
+  response = await worker.fetch(new Request("https://wenj.online/api/link?user=wenju2", { method: "PUT" }), env);
+  assert.equal(response.status, 405);
+});
+
+test("/api/check rejects non-GET methods", async () => {
+  const env = makeEnv({ health_check: makeOutlineKey() });
+
+  const response = await worker.fetch(new Request("https://wenj.online/api/check", { method: "POST" }), env);
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { message: "Method Not Allowed" });
+});
+
+test("subscription endpoint rejects non-GET methods", async () => {
+  const env = makeEnv({ wenju2: makeOutlineKey() });
+
+  const response = await worker.fetch(new Request("https://wenj.online/wenju2", { method: "POST" }), env);
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { message: "Method Not Allowed" });
 });
 
 test("subscription endpoint converts Outline keys to JSON", async () => {
@@ -384,6 +413,24 @@ test("health_check is reserved from public subscription access", async (t) => {
     status: "ok",
     message: "当前服务大陆连通性参考正常。",
   });
+});
+
+test("RESERVED_USER_IDS blocks all reserved usernames", async () => {
+  // When adding a new reserved ID to outline-subscription.js,
+  // add it here too so both /api/link and subscription endpoints stay tested.
+  const reservedIds = ["health_check"];
+
+  for (const reservedId of reservedIds) {
+    const env = makeEnv({ [reservedId]: makeOutlineKey() });
+
+    // /api/link should block
+    let response = await worker.fetch(new Request(`https://wenj.online/api/link?user=${encodeURIComponent(reservedId)}`), env);
+    assert.equal(response.status, 404, `api/link should block reserved: ${reservedId}`);
+
+    // Subscription endpoint should block
+    response = await worker.fetch(new Request(`https://wenj.online/${encodeURIComponent(reservedId)}`), env);
+    assert.equal(response.status, 404, `subscription should block reserved: ${reservedId}`);
+  }
 });
 
 test("/api/check rejects invalid health_check keys before third-party checks", async (t) => {
@@ -691,4 +738,10 @@ test("/api/check returns unavailable when health_check is missing", async (t) =>
 
 test("getUserIdFromPath returns null for root path /", () => {
   assert.equal(getUserIdFromPath("/"), null);
+});
+
+test("getUserIdFromPath strips trailing slashes", () => {
+  assert.equal(getUserIdFromPath("/zhangsan"), "zhangsan");
+  assert.equal(getUserIdFromPath("/zhangsan/"), "zhangsan");
+  assert.equal(getUserIdFromPath("/zhangsan//"), "zhangsan");
 });

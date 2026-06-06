@@ -102,12 +102,14 @@ async function fetchWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQ
   const controller = new AbortController();
   let timeoutId;
 
+  const fetchPromise = fetchImpl(url, {
+    ...init,
+    signal: controller.signal,
+  });
+
   try {
     return await Promise.race([
-      fetchImpl(url, {
-        ...init,
-        signal: controller.signal,
-      }),
+      fetchPromise,
       new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           controller.abort();
@@ -117,6 +119,9 @@ async function fetchWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQ
     ]);
   } finally {
     clearTimeout(timeoutId);
+    // When timeout wins and abort() fires, fetchPromise rejects with AbortError.
+    // This catch prevents the resulting unhandled-rejection warning.
+    fetchPromise.catch(() => {});
   }
 }
 
@@ -137,7 +142,12 @@ async function dispatchTcpCheck(fetchImpl, target, requestTimeoutMs) {
     return null;
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    return null;
+  }
   return data?.success && data?.uuid ? data.uuid : null;
 }
 
@@ -212,16 +222,21 @@ async function readCachedResult(env, target, now) {
 }
 
 async function writeCachedResult(env, target, result, now) {
-  if (!env.OUTLINE_META?.put || result.httpStatus !== 200) {
+  if (!env.OUTLINE_META?.put) {
     return;
   }
+
+  // unavailable 结果用短 TTL（30s），避免第三方 API 故障期间大量穿透
+  const checkedAt = result.status === "unavailable"
+    ? now - (CHECK_CACHE_TTL_MS - 30 * 1000)
+    : now;
 
   try {
     await env.OUTLINE_META.put(CHECK_CACHE_KEY, JSON.stringify({
       status: result.status,
       message: result.message,
       httpStatus: result.httpStatus,
-      checkedAt: now,
+      checkedAt,
       target: getTargetCacheKey(target),
     }));
   } catch (e) {
