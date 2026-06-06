@@ -23,8 +23,8 @@ export function renderHomePage() {
           --text: #1c1c1e;
           --muted: #6e6e73;
           --line: #d1d1d6;
-          --label: #8e8e93;
-          --placeholder: #a4a4aa;
+          --label: #6e6e73;
+          --placeholder: #8e8e93;
           --group-bg: rgba(255, 255, 255, 0.82);
           --link-bg: #f2f2f7;
           --link-text: #26262a;
@@ -62,6 +62,10 @@ export function renderHomePage() {
             --green: #30d158;
             --amber: #ffd60a;
             --red: #ff453a;
+          }
+
+          .icon {
+            background: #1a6b4f;
           }
         }
 
@@ -164,7 +168,41 @@ export function renderHomePage() {
 
         button:disabled {
           cursor: default;
-          opacity: 0.58;
+          opacity: 0.45;
+        }
+
+        /* ---- Spinner ---- */
+        .btn-spinner {
+          display: inline-block;
+          width: 1em;
+          height: 1em;
+          vertical-align: -0.15em;
+          border: 2px solid currentColor;
+          border-right-color: transparent;
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+          pointer-events: none;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .btn-loading-text {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        button:focus-visible {
+          outline: 2px solid var(--blue);
+          outline-offset: 2px;
+        }
+
+        .text-button:focus-visible {
+          border-radius: 6px;
         }
 
         .get-button {
@@ -231,6 +269,12 @@ export function renderHomePage() {
 
         input::placeholder {
           color: var(--placeholder);
+        }
+
+        input:focus-visible {
+          outline: 2px solid var(--blue);
+          outline-offset: 2px;
+          border-radius: 4px;
         }
 
         .service-row {
@@ -462,7 +506,7 @@ export function renderHomePage() {
             <div class="group">
               <label class="field-row" for="username">
                 <span class="field-label">账号或邮箱</span>
-                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false" onkeydown="handleUsernameKeydown(event)">
+                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus onkeydown="handleUsernameKeydown(event)">
               </label>
             </div>
           </section>
@@ -503,7 +547,17 @@ export function renderHomePage() {
       <script>
         function setButtonLoading(button, isLoading, loadingText, defaultText) {
           button.disabled = isLoading;
-          button.innerText = isLoading ? loadingText : defaultText;
+          if (isLoading) {
+            button.innerHTML = '<span class="btn-loading-text"><span class="btn-spinner"></span>' + escapeHtml(loadingText) + '</span>';
+          } else {
+            button.innerText = defaultText;
+          }
+        }
+
+        function escapeHtml(str) {
+          var el = document.createElement('div');
+          el.appendChild(document.createTextNode(str));
+          return el.innerHTML;
         }
 
         function handleUsernameKeydown(event) {
@@ -655,7 +709,7 @@ export function renderHomePage() {
           const serviceSummary = document.getElementById('serviceSummary');
 
           hideStatus('service');
-          setButtonLoading(checkButton, true, '检测中', '检测');
+          setButtonLoading(checkButton, true, '检测中（约需 5 秒）', '检测');
           serviceSummary.innerText = '正在检测服务。';
 
           try {
@@ -669,7 +723,7 @@ export function renderHomePage() {
             serviceSummary.innerText = '检测暂不可用';
             showStatus('service', 'unavailable', '检测暂不可用', '请稍后重试。');
           } finally {
-            setButtonLoading(checkButton, false, '检测中', '检测');
+            setButtonLoading(checkButton, false, '检测中（约需 5 秒）', '检测');
           }
         }
 
