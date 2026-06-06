@@ -84,7 +84,7 @@ export default {
     // 提取用户名 (例如从 /zhangsan 提取出 zhangsan)
     const userId = getUserIdFromPath(path);
 
-    if (isReservedUserId(userId)) {
+    if (!userId || isReservedUserId(userId)) {
       return new Response("用户不存在或链接错误", { status: 404 });
     }
 

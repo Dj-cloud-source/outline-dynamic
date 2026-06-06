@@ -8,6 +8,18 @@ const CHECK_POLL_DELAY_MS = 800;
 const CHECK_REQUEST_TIMEOUT_MS = 3000;
 const CHECK_CACHE_KEY = "health_check_status";
 const CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_MESSAGES_BY_STATUS = {
+  ok: new Set(["当前服务大陆连通性参考正常。"]),
+  warning: new Set([
+    "当前服务大陆连通性参考异常，请联系管理员。",
+    "当前服务部分地区可达，连通性不稳定。",
+  ]),
+  unavailable: new Set([
+    "检测暂不可用，请稍后重试。",
+    "当前服务检测未配置，请联系管理员。",
+    "当前服务检测配置异常，请联系管理员。",
+  ]),
+};
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,6 +27,24 @@ function delay(ms) {
 
 function publicResult(status, message, httpStatus = 200) {
   return { status, message, httpStatus };
+}
+
+function getValidatedCachedHttpStatus(status, httpStatus) {
+  const statusCode = httpStatus ?? 200;
+
+  if (!Number.isInteger(statusCode) || statusCode < 200 || statusCode > 599) {
+    return null;
+  }
+
+  if ((status === "ok" || status === "warning") && statusCode !== 200) {
+    return null;
+  }
+
+  if (status === "unavailable" && statusCode !== 500 && statusCode !== 503) {
+    return null;
+  }
+
+  return statusCode;
 }
 
 function summarizeTcpReport(reportData) {
@@ -160,14 +190,16 @@ async function readCachedResult(env, target, now) {
     const isFresh = typeof cachedResult.checkedAt === "number"
       && now - cachedResult.checkedAt <= CHECK_CACHE_TTL_MS;
     const matchesTarget = cachedResult.target === getTargetCacheKey(target);
-    const hasPublicShape = typeof cachedResult.status === "string"
-      && typeof cachedResult.message === "string";
+    const allowedMessages = PUBLIC_MESSAGES_BY_STATUS[cachedResult.status];
+    const hasPublicShape = Boolean(allowedMessages)
+      && allowedMessages.has(cachedResult.message);
+    const httpStatus = getValidatedCachedHttpStatus(cachedResult.status, cachedResult.httpStatus);
 
-    if (!isFresh || !matchesTarget || !hasPublicShape) {
+    if (!isFresh || !matchesTarget || !hasPublicShape || !httpStatus) {
       return null;
     }
 
-    return publicResult(cachedResult.status, cachedResult.message, cachedResult.httpStatus || 200);
+    return publicResult(cachedResult.status, cachedResult.message, httpStatus);
   } catch (e) {
     return null;
   }
@@ -193,8 +225,8 @@ async function writeCachedResult(env, target, result, now) {
 
 export async function checkCurrentService(env = {}, options = {}) {
   const fetchImpl = options.fetch || fetch;
-  const now = options.now || Date.now();
-  const requestTimeoutMs = options.requestTimeoutMs || CHECK_REQUEST_TIMEOUT_MS;
+  const now = options.now ?? Date.now();
+  const requestTimeoutMs = options.requestTimeoutMs ?? CHECK_REQUEST_TIMEOUT_MS;
   const outlineKey = await getOutlineKey(env, HEALTH_CHECK_KEY);
 
   if (!outlineKey) {
