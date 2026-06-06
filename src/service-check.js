@@ -8,6 +8,10 @@ const CHECK_POLL_DELAY_MS = 800;
 const CHECK_REQUEST_TIMEOUT_MS = 3000;
 const CHECK_CACHE_KEY = "health_check_status";
 const CHECK_CACHE_TTL_MS = 5 * 60 * 1000;
+const CHECK_NEGATIVE_CACHE_TTL_MS = 60 * 1000;
+const inFlightChecks = new Map();
+const objectIdentities = new WeakMap();
+let nextObjectIdentity = 1;
 const PUBLIC_MESSAGES_BY_STATUS = {
   ok: new Set(["当前服务大陆连通性参考正常。"]),
   warning: new Set([
@@ -47,6 +51,35 @@ function getValidatedCachedHttpStatus(status, httpStatus) {
   return statusCode;
 }
 
+function getObjectIdentity(value) {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) {
+    return String(value);
+  }
+
+  if (!objectIdentities.has(value)) {
+    objectIdentities.set(value, nextObjectIdentity);
+    nextObjectIdentity += 1;
+  }
+
+  return objectIdentities.get(value);
+}
+
+function getValidatedCachedTtlMs(cachedResult) {
+  if (cachedResult.status === "unavailable") {
+    return Number.isInteger(cachedResult.ttlMs)
+      && cachedResult.ttlMs > 0
+      && cachedResult.ttlMs <= CHECK_NEGATIVE_CACHE_TTL_MS
+      ? cachedResult.ttlMs
+      : null;
+  }
+
+  return Number.isInteger(cachedResult.ttlMs)
+    && cachedResult.ttlMs > 0
+    && cachedResult.ttlMs <= CHECK_CACHE_TTL_MS
+    ? cachedResult.ttlMs
+    : CHECK_CACHE_TTL_MS;
+}
+
 function summarizeTcpReport(reportData) {
   const nodes = reportData?.data && typeof reportData.data === "object"
     ? Object.values(reportData.data)
@@ -64,9 +97,11 @@ function summarizeTcpReport(reportData) {
 
     const latestCheck = checks[checks.length - 1];
 
-    if (Number(latestCheck?.status) === 1) {
+    const latestStatus = Number(latestCheck?.status);
+
+    if (latestStatus === 1) {
       reachable += 1;
-    } else {
+    } else if (latestStatus === 0) {
       failed += 1;
     }
   }
@@ -98,16 +133,21 @@ function getTargetCacheKey(target) {
   return `${target.host}:${target.port}`;
 }
 
-async function fetchWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQUEST_TIMEOUT_MS) {
+async function fetchJsonWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   let timeoutId;
 
   try {
     return await Promise.race([
-      fetchImpl(url, {
-        ...init,
-        signal: controller.signal,
-      }),
+      (async () => {
+        const response = await fetchImpl(url, {
+          ...init,
+          signal: controller.signal,
+        });
+        const data = response.ok ? await response.json() : null;
+
+        return { response, data };
+      })(),
       new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           controller.abort();
@@ -121,7 +161,7 @@ async function fetchWithTimeout(fetchImpl, url, init = {}, timeoutMs = CHECK_REQ
 }
 
 async function dispatchTcpCheck(fetchImpl, target, requestTimeoutMs) {
-  const response = await fetchWithTimeout(fetchImpl, `${CHECK_HOST_API_BASE}/tcp`, {
+  const { response, data } = await fetchJsonWithTimeout(fetchImpl, `${CHECK_HOST_API_BASE}/tcp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -137,26 +177,35 @@ async function dispatchTcpCheck(fetchImpl, target, requestTimeoutMs) {
     return null;
   }
 
-  const data = await response.json();
   return data?.success && data?.uuid ? data.uuid : null;
 }
 
-async function pollTcpReport(fetchImpl, uuid, requestTimeoutMs) {
+async function pollTcpReport(fetchImpl, uuid, requestTimeoutMs, pollDelayMs = CHECK_POLL_DELAY_MS) {
   let latestCompletedSummary = null;
 
   for (let attempt = 0; attempt < CHECK_POLL_ATTEMPTS; attempt += 1) {
     if (attempt > 0) {
-      await delay(CHECK_POLL_DELAY_MS);
+      await delay(pollDelayMs);
     }
 
-    const response = await fetchWithTimeout(fetchImpl, `${CHECK_HOST_API_BASE}/report/${uuid}`, {}, requestTimeoutMs);
+    let summary;
 
-    if (!response.ok) {
+    try {
+      const { response, data } = await fetchJsonWithTimeout(
+        fetchImpl,
+        `${CHECK_HOST_API_BASE}/report/${uuid}`,
+        {},
+        requestTimeoutMs,
+      );
+
+      if (!response.ok) {
+        continue;
+      }
+
+      summary = summarizeTcpReport(data);
+    } catch (e) {
       continue;
     }
-
-    const data = await response.json();
-    const summary = summarizeTcpReport(data);
 
     if (summary.reachable > 0) {
       return buildConnectivityResult(summary);
@@ -187,8 +236,11 @@ async function readCachedResult(env, target, now) {
     }
 
     const cachedResult = JSON.parse(rawCachedResult);
+    const ttlMs = getValidatedCachedTtlMs(cachedResult);
     const isFresh = typeof cachedResult.checkedAt === "number"
-      && now - cachedResult.checkedAt <= CHECK_CACHE_TTL_MS;
+      && cachedResult.checkedAt <= now
+      && ttlMs
+      && now - cachedResult.checkedAt <= ttlMs;
     const matchesTarget = cachedResult.target === getTargetCacheKey(target);
     const allowedMessages = PUBLIC_MESSAGES_BY_STATUS[cachedResult.status];
     const hasPublicShape = Boolean(allowedMessages)
@@ -206,7 +258,15 @@ async function readCachedResult(env, target, now) {
 }
 
 async function writeCachedResult(env, target, result, now) {
-  if (!env.OUTLINE_META?.put || result.httpStatus !== 200) {
+  if (!env.OUTLINE_META?.put) {
+    return;
+  }
+
+  const ttlMs = result.httpStatus === 200
+    ? CHECK_CACHE_TTL_MS
+    : CHECK_NEGATIVE_CACHE_TTL_MS;
+
+  if (result.httpStatus !== 200 && result.status !== "unavailable") {
     return;
   }
 
@@ -216,6 +276,7 @@ async function writeCachedResult(env, target, result, now) {
       message: result.message,
       httpStatus: result.httpStatus,
       checkedAt: now,
+      ttlMs,
       target: getTargetCacheKey(target),
     }));
   } catch (e) {
@@ -223,10 +284,44 @@ async function writeCachedResult(env, target, result, now) {
   }
 }
 
+async function runConnectivityCheck(env, fetchImpl, target, now, requestTimeoutMs, pollDelayMs) {
+  try {
+    const uuid = await dispatchTcpCheck(fetchImpl, target, requestTimeoutMs);
+
+    if (!uuid) {
+      const result = publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
+      await writeCachedResult(env, target, result, now);
+      return result;
+    }
+
+    const result = await pollTcpReport(fetchImpl, uuid, requestTimeoutMs, pollDelayMs);
+    await writeCachedResult(env, target, result, now);
+
+    return result;
+  } catch (e) {
+    const result = publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
+    await writeCachedResult(env, target, result, now);
+    return result;
+  }
+}
+
+function getInFlightCheckKey(env, fetchImpl, target, requestTimeoutMs, pollDelayMs) {
+  const cacheScope = env.OUTLINE_META || env;
+
+  return [
+    getTargetCacheKey(target),
+    requestTimeoutMs,
+    pollDelayMs,
+    getObjectIdentity(cacheScope),
+    getObjectIdentity(fetchImpl),
+  ].join("|");
+}
+
 export async function checkCurrentService(env = {}, options = {}) {
   const fetchImpl = options.fetch || fetch;
   const now = options.now ?? Date.now();
   const requestTimeoutMs = options.requestTimeoutMs ?? CHECK_REQUEST_TIMEOUT_MS;
+  const pollDelayMs = options.pollDelayMs ?? CHECK_POLL_DELAY_MS;
   const outlineKey = await getOutlineKey(env, HEALTH_CHECK_KEY);
 
   if (!outlineKey) {
@@ -251,18 +346,21 @@ export async function checkCurrentService(env = {}, options = {}) {
     return cachedResult;
   }
 
+  const targetCacheKey = getInFlightCheckKey(env, fetchImpl, target, requestTimeoutMs, pollDelayMs);
+  const inFlightCheck = inFlightChecks.get(targetCacheKey);
+
+  if (inFlightCheck) {
+    return await inFlightCheck;
+  }
+
+  const checkPromise = runConnectivityCheck(env, fetchImpl, target, now, requestTimeoutMs, pollDelayMs);
+  inFlightChecks.set(targetCacheKey, checkPromise);
+
   try {
-    const uuid = await dispatchTcpCheck(fetchImpl, target, requestTimeoutMs);
-
-    if (!uuid) {
-      return publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
+    return await checkPromise;
+  } finally {
+    if (inFlightChecks.get(targetCacheKey) === checkPromise) {
+      inFlightChecks.delete(targetCacheKey);
     }
-
-    const result = await pollTcpReport(fetchImpl, uuid, requestTimeoutMs);
-    await writeCachedResult(env, target, result, now);
-
-    return result;
-  } catch (e) {
-    return publicResult("unavailable", "检测暂不可用，请稍后重试。", 503);
   }
 }

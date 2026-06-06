@@ -5,8 +5,11 @@ import {
   convertOutlineKeyToJson,
   getOutlineKey,
   getUserIdFromPath,
-  isReservedUserId
+  isReservedUserId,
+  isValidUserId
 } from "./outline-subscription.js";
+
+const ALLOWED_METHODS = "GET, OPTIONS";
 
 function htmlResponse(html, init = {}) {
   const headers = new Headers(init.headers || {});
@@ -31,10 +34,48 @@ function jsonResponse(data, init = {}) {
   });
 }
 
+function textResponse(text, init = {}) {
+  const headers = new Headers(init.headers || {});
+  headers.set("Content-Type", "text/plain; charset=utf-8");
+  headers.set("Cache-Control", "no-store");
+
+  return new Response(text, {
+    ...init,
+    headers,
+  });
+}
+
+function methodNotAllowedResponse() {
+  return textResponse("Method Not Allowed", {
+    status: 405,
+    headers: {
+      "Allow": ALLOWED_METHODS,
+    },
+  });
+}
+
+function optionsResponse() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Allow": ALLOWED_METHODS,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const requestUrl = new URL(request.url);
     const path = requestUrl.pathname;
+
+    if (request.method === "OPTIONS") {
+      return optionsResponse();
+    }
+
+    if (request.method !== "GET") {
+      return methodNotAllowedResponse();
+    }
 
     // ========================================================
     // 模块 A：如果用户访问的是首页 (根目录 /)，返回交互式网页
@@ -47,7 +88,7 @@ export default {
     if (path === '/api/link') {
       const userId = (requestUrl.searchParams.get('user') || '').trim();
 
-      if (isReservedUserId(userId)) {
+      if (!isValidUserId(userId) || isReservedUserId(userId)) {
         return jsonResponse({ message: "用户不存在或输入错误。" }, { status: 404 });
       }
 
@@ -78,6 +119,10 @@ export default {
       }, { status: result.httpStatus });
     }
 
+    if (path.startsWith('/api/')) {
+      return jsonResponse({ message: "接口不存在。" }, { status: 404 });
+    }
+
     // ========================================================
     // 模块 B：处理机器请求，下发真实的 JSON 订阅数据
     // ========================================================
@@ -85,13 +130,13 @@ export default {
     const userId = getUserIdFromPath(path);
 
     if (!userId || isReservedUserId(userId)) {
-      return new Response("用户不存在或链接错误", { status: 404 });
+      return textResponse("用户不存在或链接错误", { status: 404 });
     }
 
     const outlineKey = await getOutlineKey(env, userId);
 
     if (!outlineKey) {
-      return new Response("用户不存在或链接错误", { status: 404 });
+      return textResponse("用户不存在或链接错误", { status: 404 });
     }
 
     try {
@@ -104,7 +149,7 @@ export default {
         },
       });
     } catch (e) {
-      return new Response("配置解析错误", { status: 500 });
+      return textResponse("配置解析错误", { status: 500 });
     }
   }
 };

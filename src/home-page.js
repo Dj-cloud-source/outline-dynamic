@@ -18,6 +18,7 @@ export function renderHomePage() {
           --label: #8e8e93;
           --placeholder: #a4a4aa;
           --group-bg: rgba(255, 255, 255, 0.82);
+          --group-border: rgba(0, 0, 0, 0.04);
           --link-bg: #f2f2f7;
           --link-text: #26262a;
           --copy-bg: #e8f1ff;
@@ -42,6 +43,7 @@ export function renderHomePage() {
             --label: #8e8e93;
             --placeholder: #77777c;
             --group-bg: rgba(28, 28, 30, 0.82);
+            --group-border: #38383a;
             --link-bg: #2c2c2e;
             --link-text: #f5f5f7;
             --copy-bg: rgba(10, 132, 255, 0.18);
@@ -159,9 +161,15 @@ export function renderHomePage() {
           opacity: 0.58;
         }
 
+        button:focus-visible,
+        input:focus-visible {
+          outline: 2px solid var(--blue);
+          outline-offset: 3px;
+        }
+
         .get-button {
-          min-width: 76px;
-          height: 32px;
+          min-width: 92px;
+          min-height: 40px;
           padding: 0 18px;
           border-radius: 999px;
           background: var(--blue);
@@ -190,7 +198,7 @@ export function renderHomePage() {
 
         .group {
           border-radius: 8px;
-          border: 1px solid rgba(0, 0, 0, 0.04);
+          border: 1px solid var(--group-border);
           background: var(--group-bg);
           overflow: hidden;
           backdrop-filter: blur(18px);
@@ -249,7 +257,7 @@ export function renderHomePage() {
         }
 
         .text-button {
-          height: 32px;
+          min-height: 40px;
           padding: 0 4px;
           background: transparent;
           color: var(--blue);
@@ -320,7 +328,7 @@ export function renderHomePage() {
 
         .copy-btn {
           min-width: 72px;
-          height: 32px;
+          min-height: 40px;
           padding: 0 14px;
           border-radius: 999px;
           background: var(--copy-bg);
@@ -374,7 +382,7 @@ export function renderHomePage() {
           .get-button {
             grid-column: 2;
             justify-self: start;
-            min-width: 70px;
+            min-width: 96px;
             margin-top: 10px;
             padding: 0 14px;
           }
@@ -398,9 +406,10 @@ export function renderHomePage() {
 
           .text-button {
             justify-self: start;
-            height: 26px;
-            padding: 0;
+            min-height: 40px;
+            padding: 0 6px;
           }
+
         }
 
         @media (max-width: 350px) {
@@ -439,7 +448,7 @@ export function renderHomePage() {
               <span>连接</span>
             </div>
           </div>
-          <button class="get-button" id="generateButton" onclick="generateLink()">获取</button>
+          <button class="get-button" id="generateButton" onclick="generateLink()">获取链接</button>
         </header>
 
         <div class="content">
@@ -448,7 +457,7 @@ export function renderHomePage() {
             <div class="group">
               <label class="field-row" for="username">
                 <span class="field-label">账号或邮箱</span>
-                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false" onkeydown="handleUsernameKeydown(event)">
+                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="email" oninput="handleUsernameInput()" onkeydown="handleUsernameKeydown(event)">
               </label>
             </div>
           </section>
@@ -458,7 +467,7 @@ export function renderHomePage() {
             <p class="status-detail" id="accountStatusDetail"></p>
           </section>
 
-          <section class="result" id="resultBox">
+          <section class="result" id="resultBox" role="status" aria-live="polite">
             <p class="result-title">连接链接已准备好</p>
             <p class="result-detail">复制后在客户端中打开。</p>
             <div class="link-box" id="linkText"></div>
@@ -487,13 +496,26 @@ export function renderHomePage() {
       </main>
 
       <script>
+        let activeLinkRequest = null;
+
         function setButtonLoading(button, isLoading, loadingText, defaultText) {
           button.disabled = isLoading;
           button.innerText = isLoading ? loadingText : defaultText;
         }
 
+        function handleUsernameInput() {
+          if (activeLinkRequest) {
+            activeLinkRequest.abort();
+            activeLinkRequest = null;
+          }
+
+          hideStatus('account');
+          hideResult();
+          setButtonLoading(document.getElementById('generateButton'), false, '获取中', '获取链接');
+        }
+
         function handleUsernameKeydown(event) {
-          if (event.key !== 'Enter') {
+          if (event.key !== 'Enter' || event.isComposing) {
             return;
           }
 
@@ -570,6 +592,10 @@ export function renderHomePage() {
           const generateButton = document.getElementById('generateButton');
           const linkText = document.getElementById('linkText');
 
+          if (generateButton.disabled) {
+            return;
+          }
+
           hideStatus('account');
           hideResult();
 
@@ -578,11 +604,19 @@ export function renderHomePage() {
             return;
           }
 
-          setButtonLoading(generateButton, true, '获取中', '获取');
+          const controller = new AbortController();
+          activeLinkRequest = controller;
+          setButtonLoading(generateButton, true, '获取中', '获取链接');
 
           try {
-            const response = await fetch('/api/link?user=' + encodeURIComponent(user));
+            const response = await fetch('/api/link?user=' + encodeURIComponent(user), {
+              signal: controller.signal
+            });
             const data = await response.json();
+
+            if (activeLinkRequest !== controller) {
+              return;
+            }
 
             if (!response.ok) {
               if (response.status === 404) {
@@ -596,15 +630,26 @@ export function renderHomePage() {
             linkText.innerText = data.link;
             document.getElementById('resultBox').style.display = 'block';
           } catch (err) {
+            if (activeLinkRequest !== controller || err.name === 'AbortError') {
+              return;
+            }
+
             showStatus('account', 'error', '暂时无法获取链接', '请稍后重试。');
           } finally {
-            setButtonLoading(generateButton, false, '获取中', '获取');
+            if (activeLinkRequest === controller) {
+              activeLinkRequest = null;
+              setButtonLoading(generateButton, false, '获取中', '获取链接');
+            }
           }
         }
 
         async function checkService() {
           const checkButton = document.getElementById('checkButton');
           const serviceSummary = document.getElementById('serviceSummary');
+
+          if (checkButton.disabled) {
+            return;
+          }
 
           hideStatus('service');
           setButtonLoading(checkButton, true, '检测中', '检测');

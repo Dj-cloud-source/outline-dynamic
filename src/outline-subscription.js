@@ -3,9 +3,10 @@
 // Key: zhangsan
 // Value: ss://完整密钥
 const RESERVED_USER_IDS = new Set(["health_check"]);
+const MAX_USER_ID_LENGTH = 256;
 
 export async function getOutlineKey(env = {}, userId) {
-  if (!userId || !env.OUTLINE_USERS) {
+  if (!isValidUserId(userId) || !env.OUTLINE_USERS) {
     return null;
   }
 
@@ -22,10 +23,18 @@ export function isReservedUserId(userId) {
 
 export function getUserIdFromPath(path) {
   try {
-    return decodeURIComponent(path.slice(1)).trim();
+    const userId = decodeURIComponent(path.slice(1)).trim();
+    return isValidUserId(userId) ? userId : null;
   } catch (e) {
     return null;
   }
+}
+
+export function isValidUserId(userId) {
+  return typeof userId === "string"
+    && userId.length > 0
+    && userId.length <= MAX_USER_ID_LENGTH
+    && !userId.includes("/");
 }
 
 export function buildSubscriptionLink(host, userId) {
@@ -77,8 +86,10 @@ function decodeOutlineUserInfo(base64UserInfo) {
     .replace(/_/g, "/");
   const paddingLength = (4 - (decodedBase64.length % 4)) % 4;
   const paddedBase64 = decodedBase64 + "=".repeat(paddingLength);
+  const binaryUserInfo = atob(paddedBase64);
+  const userInfoBytes = Uint8Array.from(binaryUserInfo, (char) => char.charCodeAt(0));
 
-  return atob(paddedBase64);
+  return new TextDecoder("utf-8", { fatal: true }).decode(userInfoBytes);
 }
 
 function parseOutlineCredentials(base64UserInfo) {
