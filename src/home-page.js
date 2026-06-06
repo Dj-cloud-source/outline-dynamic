@@ -9,17 +9,52 @@ export function renderHomePage() {
       <title>Client</title>
       <style>
         :root {
-          color-scheme: light;
+          color-scheme: light dark;
           --page-bg: #f2f2f7;
           --surface: #ffffff;
           --text: #1c1c1e;
           --muted: #6e6e73;
           --line: #d1d1d6;
+          --label: #8e8e93;
+          --placeholder: #a4a4aa;
+          --group-bg: rgba(255, 255, 255, 0.82);
+          --link-bg: #f2f2f7;
+          --link-text: #26262a;
+          --copy-bg: #e8f1ff;
+          --copy-bg-hover: #dceaff;
+          --copy-text: #0057b8;
+          --dot: #c7c7cc;
+          --icon-shadow: rgba(17, 61, 45, 0.18);
           --blue: #007aff;
           --blue-dark: #0063cc;
           --green: #248a3d;
           --amber: #b26a00;
           --red: #d70015;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --page-bg: #050506;
+            --surface: #1c1c1e;
+            --text: #f5f5f7;
+            --muted: #a1a1a6;
+            --line: #38383a;
+            --label: #8e8e93;
+            --placeholder: #77777c;
+            --group-bg: rgba(28, 28, 30, 0.82);
+            --link-bg: #2c2c2e;
+            --link-text: #f5f5f7;
+            --copy-bg: rgba(10, 132, 255, 0.18);
+            --copy-bg-hover: rgba(10, 132, 255, 0.26);
+            --copy-text: #64aaff;
+            --dot: #545458;
+            --icon-shadow: rgba(0, 0, 0, 0.32);
+            --blue: #0a84ff;
+            --blue-dark: #409cff;
+            --green: #30d158;
+            --amber: #ffd60a;
+            --red: #ff453a;
+          }
         }
 
         * {
@@ -39,6 +74,7 @@ export function renderHomePage() {
           background: var(--page-bg);
           color: var(--text);
           font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          transition: background-color 0.18s ease, color 0.18s ease;
         }
 
         .page {
@@ -64,7 +100,7 @@ export function renderHomePage() {
           border-radius: 8px;
           overflow: hidden;
           background: #113d2d;
-          box-shadow: 0 12px 24px rgba(17, 61, 45, 0.18);
+          box-shadow: 0 12px 24px var(--icon-shadow);
         }
 
         .icon svg {
@@ -93,7 +129,7 @@ export function renderHomePage() {
           flex-wrap: wrap;
           gap: 8px;
           margin-top: 12px;
-          color: #8e8e93;
+          color: var(--label);
           font-size: 12px;
           line-height: 1;
         }
@@ -106,7 +142,7 @@ export function renderHomePage() {
           margin-right: 8px;
           vertical-align: 3px;
           border-radius: 50%;
-          background: #c7c7cc;
+          background: var(--dot);
         }
 
         button {
@@ -146,7 +182,7 @@ export function renderHomePage() {
 
         .section-label {
           margin: 0 0 8px 2px;
-          color: #8e8e93;
+          color: var(--label);
           font-size: 12px;
           font-weight: 700;
           letter-spacing: 0;
@@ -155,7 +191,7 @@ export function renderHomePage() {
         .group {
           border-radius: 8px;
           border: 1px solid rgba(0, 0, 0, 0.04);
-          background: rgba(255, 255, 255, 0.82);
+          background: var(--group-bg);
           overflow: hidden;
           backdrop-filter: blur(18px);
         }
@@ -186,7 +222,7 @@ export function renderHomePage() {
         }
 
         input::placeholder {
-          color: #a4a4aa;
+          color: var(--placeholder);
         }
 
         .service-row {
@@ -229,7 +265,7 @@ export function renderHomePage() {
         .result {
           display: none;
           border-radius: 8px;
-          border: 1px solid rgba(0, 0, 0, 0.04);
+          border: 1px solid var(--line);
           background: var(--surface);
           padding: 16px;
         }
@@ -268,8 +304,8 @@ export function renderHomePage() {
           margin-top: 14px;
           padding: 12px;
           border-radius: 8px;
-          background: #f2f2f7;
-          color: #26262a;
+          background: var(--link-bg);
+          color: var(--link-text);
           font-size: 12px;
           line-height: 1.45;
           word-break: break-all;
@@ -287,13 +323,13 @@ export function renderHomePage() {
           height: 32px;
           padding: 0 14px;
           border-radius: 999px;
-          background: #e8f1ff;
-          color: #0057b8;
+          background: var(--copy-bg);
+          color: var(--copy-text);
           font-size: 15px;
         }
 
         .copy-btn:hover {
-          background: #dceaff;
+          background: var(--copy-bg-hover);
         }
 
         .copy-state {
@@ -412,7 +448,7 @@ export function renderHomePage() {
             <div class="group">
               <label class="field-row" for="username">
                 <span class="field-label">账号或邮箱</span>
-                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false">
+                <input type="text" id="username" placeholder="输入账号或邮箱" autocomplete="off" autocapitalize="none" spellcheck="false" onkeydown="handleUsernameKeydown(event)">
               </label>
             </div>
           </section>
@@ -454,6 +490,15 @@ export function renderHomePage() {
         function setButtonLoading(button, isLoading, loadingText, defaultText) {
           button.disabled = isLoading;
           button.innerText = isLoading ? loadingText : defaultText;
+        }
+
+        function handleUsernameKeydown(event) {
+          if (event.key !== 'Enter') {
+            return;
+          }
+
+          event.preventDefault();
+          generateLink();
         }
 
         function hideStatus(kind) {
