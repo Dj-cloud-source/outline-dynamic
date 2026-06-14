@@ -34,6 +34,29 @@ function makeOutlineKeyWithEncodedUserInfo(encodedUserInfo, host = TEST_HOST, po
   return `ss://${encodedUserInfo}@${host}:${port}/?outline=1`;
 }
 
+function decodeBase64Url(encodedValue) {
+  const base64Value = encodedValue
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const paddingLength = (4 - (base64Value.length % 4)) % 4;
+  const binaryValue = atob(base64Value + "=".repeat(paddingLength));
+  const bytes = Uint8Array.from(binaryValue, (char) => char.charCodeAt(0));
+
+  return new TextDecoder().decode(bytes);
+}
+
+function parseShadowrocketNode(node) {
+  const url = new URL(node);
+
+  return {
+    protocol: url.protocol,
+    credentials: decodeBase64Url(url.username),
+    host: url.hostname,
+    port: Number(url.port),
+    nodeName: decodeURIComponent(url.hash.slice(1)),
+  };
+}
+
 function makeInvalidOutlineKeys() {
   const encodedUserInfo = encodeUserInfo(TEST_USER_INFO);
 
@@ -173,8 +196,10 @@ function createHomePageRuntime(fetchImpl) {
     "accountStatusTitle",
     "accountStatusDetail",
     "resultBox",
-    "linkText",
-    "copyState",
+    "outlineLinkText",
+    "shadowrocketLinkText",
+    "outlineCopyState",
+    "shadowrocketCopyState",
     "checkButton",
     "serviceSummary",
     "serviceStatusBox",
@@ -195,12 +220,14 @@ test("/api/link returns subscription links and hides unknown users", async () =>
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     link: "ssconf://wenj.online/wenju2",
+    shadowrocketLink: "https://wenj.online/sub/shadowrocket/wenju2",
   });
 
   response = await worker.fetch(new Request("https://wenj.online/api/link?user=haytao0726%40gmail.com"), env);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     link: "ssconf://wenj.online/haytao0726@gmail.com",
+    shadowrocketLink: "https://wenj.online/sub/shadowrocket/haytao0726@gmail.com",
   });
 
   response = await worker.fetch(new Request("https://wenj.online/api/link?user=missing"), env);
@@ -215,7 +242,7 @@ test("Worker only allows GET and OPTIONS requests", async () => {
     wenju2: makeOutlineKey(),
   });
 
-  for (const path of ["/api/link?user=wenju2", "/wenju2"]) {
+  for (const path of ["/api/link?user=wenju2", "/sub/shadowrocket/wenju2", "/wenju2"]) {
     for (const method of ["HEAD", "POST", "PUT", "PATCH", "DELETE"]) {
       const response = await worker.fetch(new Request(`https://wenj.online${path}`, {
         method,
@@ -266,6 +293,8 @@ test("invalid user ids are rejected before KV lookup", async () => {
   const cases = [
     ["https://wenj.online/api/link?user=a%2Fb", "json"],
     [`https://wenj.online/api/link?user=${tooLongUserId}`, "json"],
+    ["https://wenj.online/sub/shadowrocket/a%2Fb", "text"],
+    [`https://wenj.online/sub/shadowrocket/${tooLongUserId}`, "text"],
     ["https://wenj.online/a%2Fb", "text"],
     ["https://wenj.online/a/b", "text"],
     [`https://wenj.online/${tooLongUserId}`, "text"],
@@ -367,6 +396,92 @@ test("subscription endpoint decodes UTF-8 Outline credentials", async () => {
     password: "密码",
     method: "chacha20-ietf-poly1305",
   });
+});
+
+test("shadowrocket subscription endpoint returns a dynamic ss subscription", async () => {
+  const env = makeEnv({
+    wenju2: makeOutlineKey(),
+    "haytao0726@gmail.com": makeOutlineKeyWithEncodedUserInfo(
+      encodeUtf8UserInfo("chacha20-ietf-poly1305:密码")
+    ),
+  });
+  env.SHADOWROCKET_NODE_NAME = "Wenj VPN";
+
+  let response = await worker.fetch(new Request("https://wenj.online/sub/shadowrocket/wenju2"), env);
+  let body = await response.text();
+  let node = parseShadowrocketNode(body);
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("Content-Type"), /text\/plain/);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(node, {
+    protocol: "ss:",
+    credentials: TEST_USER_INFO,
+    host: TEST_HOST,
+    port: TEST_PORT,
+    nodeName: "Wenj VPN",
+  });
+
+  response = await worker.fetch(new Request("https://wenj.online/sub/shadowrocket/haytao0726%40gmail.com"), env);
+  body = await response.text();
+  node = parseShadowrocketNode(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(node.credentials, "chacha20-ietf-poly1305:密码");
+  assert.equal(node.nodeName, "Wenj VPN");
+});
+
+test("shadowrocket subscription endpoint hides missing and reserved users", async () => {
+  const tooLongUserId = "x".repeat(257);
+  let kvReads = 0;
+  const env = {
+    OUTLINE_USERS: {
+      get: async () => {
+        kvReads += 1;
+        return makeOutlineKey();
+      },
+    },
+  };
+
+  for (const url of [
+    "https://wenj.online/sub/shadowrocket/a%2Fb",
+    `https://wenj.online/sub/shadowrocket/${tooLongUserId}`,
+    "https://wenj.online/sub/shadowrocket/health_check",
+  ]) {
+    const response = await worker.fetch(new Request(url), env);
+
+    assert.equal(response.status, 404, url);
+    assert.equal(response.headers.get("Cache-Control"), "no-store", url);
+    assert.equal(await response.text(), "用户不存在或链接错误", url);
+  }
+
+  assert.equal(kvReads, 0);
+
+  const missingResponse = await worker.fetch(
+    new Request("https://wenj.online/sub/shadowrocket/missing"),
+    makeEnv({})
+  );
+
+  assert.equal(missingResponse.status, 404);
+  assert.equal(await missingResponse.text(), "用户不存在或链接错误");
+});
+
+test("shadowrocket subscription endpoint rejects malformed Outline key variants", async () => {
+  for (const [name, outlineKey] of makeInvalidOutlineKeys()) {
+    const env = makeEnv({
+      broken: outlineKey,
+    });
+
+    const response = await worker.fetch(new Request("https://wenj.online/sub/shadowrocket/broken"), env);
+    const body = await response.text();
+
+    assert.equal(response.status, 500, name);
+    assert.equal(response.headers.get("Cache-Control"), "no-store", name);
+    assert.equal(body, "配置解析错误", name);
+    assert.equal(body.includes(TEST_HOST), false, name);
+    assert.equal(body.includes("testpass"), false, name);
+    assert.equal(body.includes("chacha20-ietf-poly1305"), false, name);
+  }
 });
 
 test("subscription endpoint rejects malformed Outline key variants", async () => {
@@ -1250,7 +1365,12 @@ test("home page includes stale-result and accessibility safeguards", () => {
   assert.match(html, /id="generateButton" onclick="generateLink\(\)">获取链接<\/button>/);
   assert.match(html, /inputmode="email" oninput="handleUsernameInput\(\)"/);
   assert.match(html, /class="result" id="resultBox" role="status" aria-live="polite"/);
-  assert.match(html, /id="copyState"><\/span>/);
+  assert.match(html, /Outline 订阅链接/);
+  assert.match(html, /小火箭订阅链接/);
+  assert.match(html, /id="outlineLinkText"/);
+  assert.match(html, /id="shadowrocketLinkText"/);
+  assert.match(html, /id="outlineCopyState"><\/span>/);
+  assert.match(html, /id="shadowrocketCopyState"><\/span>/);
   assert.match(html, /let activeLinkRequest = null/);
   assert.match(html, /activeLinkRequest\.abort\(\)/);
   assert.match(html, /new AbortController\(\)/);
@@ -1269,6 +1389,7 @@ test("home page ignores IME Enter and duplicate link submissions", async () => {
     return await new Promise((resolve) => {
       resolveFetch = () => resolve(jsonResponse({
         link: "ssconf://wenj.online/wenju2",
+        shadowrocketLink: "https://wenj.online/sub/shadowrocket/wenju2",
       }));
     });
   });
@@ -1295,7 +1416,17 @@ test("home page ignores IME Enter and duplicate link submissions", async () => {
   await Promise.all([firstRequest, secondRequest]);
 
   assert.equal(elements.generateButton.disabled, false);
-  assert.equal(elements.linkText.innerText, "ssconf://wenj.online/wenju2");
+  assert.equal(elements.outlineLinkText.innerText, "ssconf://wenj.online/wenju2");
+  assert.equal(elements.shadowrocketLinkText.innerText, "https://wenj.online/sub/shadowrocket/wenju2");
+
+  let copiedLink = null;
+  context.navigator.clipboard.writeText = async (text) => {
+    copiedLink = text;
+  };
+  await context.copyLink("shadowrocketLinkText", "shadowrocketCopyState");
+
+  assert.equal(copiedLink, "https://wenj.online/sub/shadowrocket/wenju2");
+  assert.equal(elements.shadowrocketCopyState.innerText, "已复制");
 });
 
 test("home page keeps stale aborted link errors from replacing new input state", async () => {

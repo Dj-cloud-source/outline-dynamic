@@ -8,6 +8,11 @@ import {
   isReservedUserId,
   isValidUserId
 } from "./outline-subscription.js";
+import {
+  buildShadowrocketSubscriptionLink,
+  convertOutlineKeyToShadowrocketSubscription,
+  getShadowrocketUserIdFromPath
+} from "./shadowrocket-subscription.js";
 
 const ALLOWED_METHODS = "GET, OPTIONS";
 
@@ -106,6 +111,7 @@ export default {
 
       return jsonResponse({
         link: buildSubscriptionLink(requestUrl.host, userId),
+        shadowrocketLink: buildShadowrocketSubscriptionLink(requestUrl.host, userId),
       });
     }
 
@@ -121,6 +127,31 @@ export default {
 
     if (path.startsWith('/api/')) {
       return jsonResponse({ message: "接口不存在。" }, { status: 404 });
+    }
+
+    if (path.startsWith('/sub/shadowrocket/')) {
+      const userId = getShadowrocketUserIdFromPath(path);
+
+      if (!isValidUserId(userId) || isReservedUserId(userId)) {
+        return textResponse("用户不存在或链接错误", { status: 404 });
+      }
+
+      const outlineKey = await getOutlineKey(env, userId);
+
+      if (!outlineKey) {
+        return textResponse("用户不存在或链接错误", { status: 404 });
+      }
+
+      try {
+        const subscription = convertOutlineKeyToShadowrocketSubscription(
+          outlineKey,
+          env.SHADOWROCKET_NODE_NAME
+        );
+
+        return textResponse(subscription);
+      } catch (e) {
+        return textResponse("配置解析错误", { status: 500 });
+      }
     }
 
     // ========================================================

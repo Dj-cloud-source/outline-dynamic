@@ -309,7 +309,6 @@ export function renderHomePage() {
         }
 
         .link-box {
-          margin-top: 14px;
           padding: 12px;
           border-radius: 8px;
           background: var(--link-bg);
@@ -317,6 +316,20 @@ export function renderHomePage() {
           font-size: 12px;
           line-height: 1.45;
           word-break: break-all;
+        }
+
+        .link-list {
+          display: grid;
+          gap: 14px;
+          margin-top: 14px;
+        }
+
+        .link-item-title {
+          margin: 0 0 8px;
+          color: var(--text);
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.3;
         }
 
         .copy-row {
@@ -470,10 +483,23 @@ export function renderHomePage() {
           <section class="result" id="resultBox" role="status" aria-live="polite">
             <p class="result-title">连接链接已准备好</p>
             <p class="result-detail">复制后在客户端中打开。</p>
-            <div class="link-box" id="linkText"></div>
-            <div class="copy-row">
-              <button class="copy-btn" onclick="copyLink()">复制</button>
-              <span class="copy-state" id="copyState"></span>
+            <div class="link-list">
+              <div class="link-item">
+                <p class="link-item-title">Outline 订阅链接</p>
+                <div class="link-box" id="outlineLinkText"></div>
+                <div class="copy-row">
+                  <button class="copy-btn" onclick="copyLink('outlineLinkText', 'outlineCopyState')">复制</button>
+                  <span class="copy-state" id="outlineCopyState"></span>
+                </div>
+              </div>
+              <div class="link-item">
+                <p class="link-item-title">小火箭订阅链接</p>
+                <div class="link-box" id="shadowrocketLinkText"></div>
+                <div class="copy-row">
+                  <button class="copy-btn" onclick="copyLink('shadowrocketLinkText', 'shadowrocketCopyState')">复制</button>
+                  <span class="copy-state" id="shadowrocketCopyState"></span>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -547,12 +573,16 @@ export function renderHomePage() {
 
         function hideResult() {
           const resultBox = document.getElementById('resultBox');
-          const linkText = document.getElementById('linkText');
-          const copyState = document.getElementById('copyState');
+          const outlineLinkText = document.getElementById('outlineLinkText');
+          const shadowrocketLinkText = document.getElementById('shadowrocketLinkText');
+          const outlineCopyState = document.getElementById('outlineCopyState');
+          const shadowrocketCopyState = document.getElementById('shadowrocketCopyState');
 
           resultBox.style.display = 'none';
-          linkText.innerText = '';
-          copyState.innerText = '';
+          outlineLinkText.innerText = '';
+          shadowrocketLinkText.innerText = '';
+          outlineCopyState.innerText = '';
+          shadowrocketCopyState.innerText = '';
         }
 
         function normalizeServiceMessage(status, responseOk, originalMessage) {
@@ -590,7 +620,8 @@ export function renderHomePage() {
         async function generateLink() {
           const user = document.getElementById('username').value.trim();
           const generateButton = document.getElementById('generateButton');
-          const linkText = document.getElementById('linkText');
+          const outlineLinkText = document.getElementById('outlineLinkText');
+          const shadowrocketLinkText = document.getElementById('shadowrocketLinkText');
 
           if (generateButton.disabled) {
             return;
@@ -627,7 +658,8 @@ export function renderHomePage() {
               return;
             }
 
-            linkText.innerText = data.link;
+            outlineLinkText.innerText = data.link;
+            shadowrocketLinkText.innerText = data.shadowrocketLink;
             document.getElementById('resultBox').style.display = 'block';
           } catch (err) {
             if (activeLinkRequest !== controller || err.name === 'AbortError') {
@@ -670,9 +702,9 @@ export function renderHomePage() {
           }
         }
 
-        async function copyLink() {
-          const link = document.getElementById('linkText').innerText;
-          const copyState = document.getElementById('copyState');
+        async function copyLink(linkElementId, copyStateElementId) {
+          const link = document.getElementById(linkElementId).innerText;
+          const copyState = document.getElementById(copyStateElementId);
 
           try {
             await navigator.clipboard.writeText(link);

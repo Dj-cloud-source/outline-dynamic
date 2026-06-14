@@ -2,6 +2,9 @@ name = "outline-dynamic"
 main = "src/index.js"
 compatibility_date = "2026-06-03"
 
+[vars]
+SHADOWROCKET_NODE_NAME = "Outline"
+
 [[kv_namespaces]]
 binding = "OUTLINE_USERS"
 id = "4397c674c35e45cf98c054ea0d3cb4dd"
