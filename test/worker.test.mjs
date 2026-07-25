@@ -1357,6 +1357,7 @@ test("/api/check returns unavailable when health_check is missing", async (t) =>
 test("home page includes stale-result and accessibility safeguards", () => {
   const html = renderHomePage();
 
+  assert.match(html, /content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/);
   assert.match(html, /button:focus-visible,\s*input:focus-visible/);
   assert.match(html, /--group-border: #38383a/);
   assert.match(html, /\.get-button \{[\s\S]*min-height: 40px/);

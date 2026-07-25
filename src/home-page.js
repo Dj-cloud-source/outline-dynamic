@@ -4,7 +4,7 @@ export function renderHomePage() {
     <html lang="zh-CN">
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
       <meta name="robots" content="noindex,nofollow">
       <title>Client</title>
       <style>
