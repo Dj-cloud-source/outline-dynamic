@@ -165,6 +165,7 @@ function createHomePageRuntime(fetchImpl) {
   const html = renderHomePage();
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   const elements = {};
+  const documentListeners = new Map();
   const document = {
     getElementById: (id) => {
       if (!elements[id]) {
@@ -172,6 +173,11 @@ function createHomePageRuntime(fetchImpl) {
       }
 
       return elements[id];
+    },
+    addEventListener: (type, listener, options) => {
+      const listeners = documentListeners.get(type) || [];
+      listeners.push({ listener, options });
+      documentListeners.set(type, listeners);
     },
   };
   const context = {
@@ -207,7 +213,7 @@ function createHomePageRuntime(fetchImpl) {
     "serviceStatusDetail",
   ].forEach((id) => document.getElementById(id));
 
-  return { context, elements };
+  return { context, elements, documentListeners };
 }
 
 test("/api/link returns subscription links and hides unknown users", async () => {
@@ -1358,6 +1364,7 @@ test("home page includes stale-result and accessibility safeguards", () => {
   const html = renderHomePage();
 
   assert.match(html, /content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/);
+  assert.match(html, /touch-action: pan-x pan-y/);
   assert.match(html, /button:focus-visible,\s*input:focus-visible/);
   assert.match(html, /--group-border: #38383a/);
   assert.match(html, /\.get-button \{[\s\S]*min-height: 40px/);
@@ -1379,6 +1386,47 @@ test("home page includes stale-result and accessibility safeguards", () => {
   assert.match(html, /activeLinkRequest !== controller \|\| err\.name === 'AbortError'/);
   assert.match(html, /if \(generateButton\.disabled\)/);
   assert.match(html, /if \(checkButton\.disabled\)/);
+});
+
+test("home page blocks iOS pinch zoom without blocking single-touch scrolling", () => {
+  const { documentListeners } = createHomePageRuntime(async () => jsonResponse({}));
+
+  for (const eventType of ["gesturestart", "gesturechange"]) {
+    const [{ listener, options }] = documentListeners.get(eventType);
+    let prevented = false;
+
+    listener({
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+
+    assert.equal(prevented, true, eventType);
+    assert.equal(options.passive, false, eventType);
+  }
+
+  for (const eventType of ["touchstart", "touchmove"]) {
+    const [{ listener, options }] = documentListeners.get(eventType);
+    let singleTouchPrevented = false;
+    let multiTouchPrevented = false;
+
+    listener({
+      touches: [{}],
+      preventDefault: () => {
+        singleTouchPrevented = true;
+      },
+    });
+    listener({
+      touches: [{}, {}],
+      preventDefault: () => {
+        multiTouchPrevented = true;
+      },
+    });
+
+    assert.equal(singleTouchPrevented, false, eventType);
+    assert.equal(multiTouchPrevented, true, eventType);
+    assert.equal(options.passive, false, eventType);
+  }
 });
 
 test("home page ignores IME Enter and duplicate link submissions", async () => {

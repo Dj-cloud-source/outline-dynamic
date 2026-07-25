@@ -67,6 +67,7 @@ export function renderHomePage() {
         body {
           width: 100%;
           overflow-x: hidden;
+          touch-action: pan-x pan-y;
         }
 
         body {
@@ -523,6 +524,21 @@ export function renderHomePage() {
 
       <script>
         let activeLinkRequest = null;
+
+        function preventGestureZoom(event) {
+          event.preventDefault();
+        }
+
+        function preventMultiTouchZoom(event) {
+          if (event.touches && event.touches.length > 1) {
+            event.preventDefault();
+          }
+        }
+
+        document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+        document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+        document.addEventListener('touchstart', preventMultiTouchZoom, { passive: false });
+        document.addEventListener('touchmove', preventMultiTouchZoom, { passive: false });
 
         function setButtonLoading(button, isLoading, loadingText, defaultText) {
           button.disabled = isLoading;
